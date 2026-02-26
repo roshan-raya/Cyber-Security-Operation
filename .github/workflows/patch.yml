@@ -1,0 +1,33 @@
+name: Patch Orchestration
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start stack
+        run: |
+          cp .env.example .env 2>/dev/null || true
+          docker compose --profile sim up -d
+
+      - name: Wait for services
+        run: sleep 30
+
+      - name: Run patch
+        run: make patch
+
+      - name: Show report
+        run: make patch-report
+        continue-on-error: true

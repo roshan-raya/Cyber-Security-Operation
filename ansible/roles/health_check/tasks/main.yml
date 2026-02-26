@@ -1,0 +1,33 @@
+---
+# Health check: gather facts, ping, uptime, SSH service (ssh or sshd), summary
+- name: Gather facts
+  ansible.builtin.setup:
+
+- name: Ping (connection check)
+  ansible.builtin.ping:
+
+- name: Check system uptime
+  ansible.builtin.command: uptime
+  register: uptime_out
+  changed_when: false
+
+- name: Display uptime
+  ansible.builtin.debug:
+    var: uptime_out.stdout
+
+- name: Ensure SSH service is active (try ssh)
+  ansible.builtin.service:
+    name: ssh
+    state: started
+  register: ssh_svc
+  ignore_errors: true
+
+- name: Ensure SSH service is active (try sshd)
+  ansible.builtin.service:
+    name: sshd
+    state: started
+  when: ssh_svc is failed
+
+- name: Health check summary
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: SSH OK, uptime OK, ssh service active"

@@ -1,0 +1,10 @@
+---
+# Common: record start time and default failure flag for reporting
+- name: Record start time
+  ansible.builtin.set_fact:
+    patch_start_epoch: "{{ ansible_facts['date_time']['epoch'] }}"
+  run_once: true
+
+- name: Set patch failed flag (default)
+  ansible.builtin.set_fact:
+    patch_failed: false
