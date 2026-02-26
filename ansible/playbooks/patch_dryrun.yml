@@ -1,0 +1,26 @@
+---
+# Sprint 2: Patch dry run (check mode - no changes applied)
+- hosts: patch_targets
+  tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Update apt cache (dry run)
+      ansible.builtin.apt:
+        update_cache: yes
+      check_mode: true
+
+    - name: Upgrade packages - dry run
+      ansible.builtin.apt:
+        upgrade: safe
+      check_mode: true
+      register: upgrade_dry
+
+    - name: Check if reboot would be required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Dry run summary
+      ansible.builtin.debug:
+        msg: "Host {{ inventory_hostname }}: upgrade would change={{ upgrade_dry.changed | default(false) }}, reboot_required={{ reboot_required.stat.exists | default(false) }}"

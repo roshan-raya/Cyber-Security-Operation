@@ -1,0 +1,41 @@
+# Environment and secrets
+.env
+*.pem
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ansible
+*.retry
+.ansible/
+ansible/.ssh/
+ansible/patch.log
+ansible/keys/
+
+# Logs and temp
+*.log
+tmp/
+temp/
+
+# Grafana (runtime data, not provisioning)
+grafana/data/
+
+# Prometheus (runtime data)
+prometheus/data/

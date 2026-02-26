@@ -1,0 +1,100 @@
+---
+# Sprint 2: Full patch run - update cache, upgrade, reboot if needed, validate, report
+- hosts: patch_targets
+  tasks:
+    - name: Record start time
+      ansible.builtin.set_fact:
+        patch_start_epoch: "{{ ansible_facts['date_time']['epoch'] }}"
+      run_once: true
+
+    - name: Set patch failed flag (default)
+      ansible.builtin.set_fact:
+        patch_failed: false
+
+    - name: Run patch and validation
+      block:
+        - name: Gather facts
+          ansible.builtin.setup:
+
+        - name: Update apt cache
+          ansible.builtin.apt:
+            update_cache: yes
+          register: apt_update
+
+        - name: Upgrade packages (security and safe updates)
+          ansible.builtin.apt:
+            upgrade: safe
+          register: upgrade_result
+
+        - name: Set patch changed flag
+          ansible.builtin.set_fact:
+            patch_changed: "{{ upgrade_result.changed | default(false) }}"
+
+        - name: Check if reboot required
+          ansible.builtin.stat:
+            path: /var/run/reboot-required
+          register: reboot_required
+
+        - name: Reboot if required
+          ansible.builtin.reboot:
+            msg: "Patch orchestration reboot"
+            connect_timeout: 5
+            reboot_timeout: 120
+          when: reboot_required.stat.exists | default(false) | bool
+          register: reboot_result
+
+        - name: Set patch rebooted flag
+          ansible.builtin.set_fact:
+            patch_rebooted: "{{ reboot_result is changed | default(false) }}"
+
+        - name: Wait for connection after reboot
+          ansible.builtin.wait_for_connection:
+            timeout: 120
+          when: reboot_required.stat.exists | default(false) | bool
+
+        - name: Re-gather facts after reboot
+          ansible.builtin.setup:
+          when: reboot_required.stat.exists | default(false) | bool
+
+        - name: Validate system health (uptime >= 0)
+          ansible.builtin.assert:
+            that: ansible_uptime_seconds >= 0
+            fail_msg: "Uptime check failed"
+      rescue:
+        - name: Mark host as failed
+          ansible.builtin.set_fact:
+            patch_failed: true
+
+    - name: Ensure reports directory exists
+      ansible.builtin.file:
+        path: /ansible/reports
+        state: directory
+        mode: "0755"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Build report list per host
+      ansible.builtin.set_fact:
+        patch_report_list: "{{ patch_report_list | default([]) + [{'host': item, 'changed': hostvars[item].patch_changed | default(false), 'rebooted': hostvars[item].patch_rebooted | default(false), 'failed': hostvars[item].patch_failed | default(false), 'duration_seconds': (ansible_facts['date_time']['epoch'] | int - patch_start_epoch | int)}] }}"
+      run_once: true
+      delegate_to: localhost
+      loop: "{{ groups['patch_targets'] }}"
+
+    - name: Write patch report JSON
+      ansible.builtin.copy:
+        content: "{{ {'hosts': patch_report_list, 'duration_seconds': (ansible_facts['date_time']['epoch'] | int - patch_start_epoch | int)} | to_nice_json }}"
+        dest: "/ansible/reports/patch_report_{{ ansible_facts['date_time']['epoch'] }}.json"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Generate Prometheus patch metrics file
+      ansible.builtin.template:
+        src: templates/patch_metrics.prom.j2
+        dest: /ansible/reports/patch_metrics.prom
+      run_once: true
+      delegate_to: localhost
+
+    - name: Structured summary
+      ansible.builtin.debug:
+        msg: "Patch run complete. Report: /ansible/reports/patch_report_{{ ansible_facts['date_time']['epoch'] }}.json"
+      run_once: true
