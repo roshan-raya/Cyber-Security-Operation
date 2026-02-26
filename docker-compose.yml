@@ -1,0 +1,231 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    user: nobody
+    read_only: true
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus_data:/prometheus
+    # Data volume use: path and retention are explicit for restart safety and bounded disk usage
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    user: grafana
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-changeme}
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_USERS_ALLOW_SIGN_UP=${GF_USERS_ALLOW_SIGN_UP:-false}
+      - GF_AUTH_ANONYMOUS_ENABLED=${GF_AUTH_ANONYMOUS_ENABLED:-false}
+      - GF_SERVER_HTTP_PORT=3000
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  node-exporter-1:
+    image: prom/node-exporter:v1.8.0
+    profiles:
+      - sim
+    container_name: node-exporter-1
+    user: nobody
+    read_only: true
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.rootfs=/rootfs
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  node-exporter-2:
+    image: prom/node-exporter:v1.8.0
+    profiles:
+      - sim
+    container_name: node-exporter-2
+    user: nobody
+    read_only: true
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.rootfs=/rootfs
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Sprint 2: Ansible control node (patch orchestration); Sprint 3: metrics on 9101
+  ansible:
+    build:
+      context: ./ansible
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ""
+        HTTPS_PROXY: ""
+        ALL_PROXY: ""
+        NO_PROXY: ""
+    container_name: ansible
+    profiles:
+      - sim
+    volumes:
+      - ansible_ssh:/ansible/.ssh
+      - ./ansible/playbooks:/ansible/playbooks:ro
+      - ./ansible/inventory:/ansible/inventory:ro
+      - ssh_pubkey:/ssh_pubkey
+      - ansible_reports:/ansible/reports
+    networks:
+      - monitoring
+    expose:
+      - "9101"
+    depends_on:
+      - patch-target-1
+      - patch-target-2
+      - patch-target-3
+      - patch-target-4
+      - patch-target-5
+
+  # Sprint 2: Patch target containers (simulated Linux servers with SSH)
+  patch-target-1:
+    build:
+      context: ./ansible/target
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ""
+        HTTPS_PROXY: ""
+        ALL_PROXY: ""
+        NO_PROXY: ""
+    container_name: patch-target-1
+    profiles:
+      - sim
+    volumes:
+      - ssh_pubkey:/ssh_pubkey:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  patch-target-2:
+    build:
+      context: ./ansible/target
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ""
+        HTTPS_PROXY: ""
+        ALL_PROXY: ""
+        NO_PROXY: ""
+    container_name: patch-target-2
+    profiles:
+      - sim
+    volumes:
+      - ssh_pubkey:/ssh_pubkey:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  patch-target-3:
+    build:
+      context: ./ansible/target
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ""
+        HTTPS_PROXY: ""
+        ALL_PROXY: ""
+        NO_PROXY: ""
+    container_name: patch-target-3
+    profiles:
+      - sim
+    volumes:
+      - ssh_pubkey:/ssh_pubkey:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  patch-target-4:
+    build:
+      context: ./ansible/target
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ""
+        HTTPS_PROXY: ""
+        ALL_PROXY: ""
+        NO_PROXY: ""
+    container_name: patch-target-4
+    profiles:
+      - sim
+    volumes:
+      - ssh_pubkey:/ssh_pubkey:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  patch-target-5:
+    build:
+      context: ./ansible/target
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ""
+        HTTPS_PROXY: ""
+        ALL_PROXY: ""
+        NO_PROXY: ""
+    container_name: patch-target-5
+    profiles:
+      - sim
+    volumes:
+      - ssh_pubkey:/ssh_pubkey:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  ansible_ssh:
+  ssh_pubkey:
+  ansible_reports:
