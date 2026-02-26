@@ -37,7 +37,7 @@ jobs:
       - name: Start stack
         run: |
           docker compose --profile sim up -d
-          sleep 15
+          sleep 45
 
       - name: Ansible syntax check (inside ansible container)
         run: |
