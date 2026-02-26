@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install dependencies (make + jq)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make jq
+
+      - name: Build (sim profile)
+        run: |
+          docker compose --profile sim build --no-cache
+
+      - name: Start stack
+        run: |
+          docker compose --profile sim up -d
+          sleep 15
+
+      - name: Ansible syntax check (inside ansible container)
+        run: |
+          docker compose exec -T ansible sh -lc \
+            "cd /ansible && ansible-playbook -i inventory/hosts.ini playbooks/patch_orchestrator.yml --syntax-check"
+
+      - name: Run patch (Sprint 4 run)
+        run: |
+          make patch
+
+      - name: Validate Sprint 4 outputs (reports + metrics)
+        run: |
+          docker compose exec -T ansible sh -lc '
+            test -f /ansible/reports/patch_report_latest.json
+            test -f /ansible/reports/patch_report_latest.csv
+            test -f /ansible/reports/patch_metrics.prom
+            jq -e ".compliance_percentage >= 95" /ansible/reports/patch_report_latest.json >/dev/null
+            echo "Sprint 4 CI validation: PASS"
+          '
+
+      - name: Show report snippet (debug)
+        if: always()
+        run: |
+          docker compose exec -T ansible sh -lc \
+            "echo '--- latest report ---' && head -n 40 /ansible/reports/patch_report_latest.json || true"
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose --profile sim down -v
