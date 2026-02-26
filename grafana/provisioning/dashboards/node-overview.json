@@ -177,7 +177,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[10m])) * 100)",
           "legendFormat": "{{ instance }}",
           "refId": "A"
         }
@@ -411,7 +411,7 @@
       "id": 16,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(patch_host_success{group=\"blue\", environment=~\"$environment\"}) / count(patch_host_success{group=\"blue\", environment=~\"$environment\"}) * 100", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg(patch_host_success{group=\"blue\"}) * 100", "refId": "A"}],
       "title": "Blue Success %",
       "type": "stat"
     },
@@ -432,7 +432,7 @@
       "id": 17,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(patch_host_success{group=\"green\", environment=~\"$environment\"}) / count(patch_host_success{group=\"green\", environment=~\"$environment\"}) * 100", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg(patch_host_success{group=\"green\"}) * 100", "refId": "A"}],
       "title": "Green Success %",
       "type": "stat"
     }
@@ -440,7 +440,7 @@
   "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["sprint1", "node", "overview", "sprint3", "sprint4"],
+  "tags": ["node", "overview"],
   "templating": {
     "list": [
       {

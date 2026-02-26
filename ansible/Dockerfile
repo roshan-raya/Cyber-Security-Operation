@@ -12,7 +12,7 @@ ENV all_proxy=""
 RUN http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= all_proxy= \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-      openssh-client sshpass curl && \
+      openssh-client sshpass curl jq && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir ansible-core

@@ -5,6 +5,6 @@ if [ ! -f /ansible/.ssh/id_rsa ]; then
   ssh-keygen -t ed25519 -f /ansible/.ssh/id_rsa -N ""
 fi
 cp /ansible/.ssh/id_rsa.pub /ssh_pubkey/id_rsa.pub
-# Sprint 3: start metrics exporter (port 9101) for Prometheus scrape
+# Start metrics exporter (port 9101) for Prometheus scrape
 python3 /ansible/metrics_exporter.py &
 exec "$@"

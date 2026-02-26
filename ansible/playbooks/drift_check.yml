@@ -1,0 +1,28 @@
+---
+# Level 2: Drift detection — report unexpected package versions / config drift
+- name: Drift detection
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Gather installed packages (dpkg)
+      ansible.builtin.shell: dpkg -l
+      register: pkg_list
+      changed_when: false
+
+    - name: Record package list for baseline comparison
+      ansible.builtin.set_fact:
+        drift_packages: "{{ pkg_list.stdout_lines | select('match', '^ii') | list }}"
+
+    - name: Check for unexpected or hold packages
+      ansible.builtin.shell: dpkg -l | grep -E '^hi|^iF' || true
+      register: held_or_bad
+      changed_when: false
+      failed_when: false
+
+    - name: Drift summary (package count)
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ drift_packages | length }} installed packages; held/bad: {{ held_or_bad.stdout_lines | default([]) | length }} lines"
+
+    - name: Report drift (unexpected versions can be added via baseline file)
+      ansible.builtin.debug:
+        msg: "Drift check complete. For strict baseline, add a role that compares to expected package set."

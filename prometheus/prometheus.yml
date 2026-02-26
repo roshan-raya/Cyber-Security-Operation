@@ -14,11 +14,13 @@ alerting:
 
 scrape_configs:
   - job_name: prometheus
+    scrape_interval: 15s
     static_configs:
       - targets:
           - localhost:9090
 
   - job_name: node-exporter
+    scrape_interval: 15s
     static_configs:
       - targets:
           - node-exporter-1:9100
@@ -28,6 +30,7 @@ scrape_configs:
           role: game-node
 
   - job_name: patch_metrics
+    scrape_interval: 15s
     static_configs:
       - targets:
           - ansible:9101
@@ -35,6 +38,7 @@ scrape_configs:
           role: patch-orchestration
 
   - job_name: alertmanager
+    scrape_interval: 15s
     static_configs:
       - targets:
           - alertmanager:9093

@@ -18,6 +18,9 @@ services:
       - "9090:9090"
     networks:
       - monitoring
+    depends_on:
+      alertmanager:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
       interval: 10s
@@ -31,11 +34,18 @@ services:
     container_name: alertmanager
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
     networks:
       - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped
 
   grafana:
@@ -110,7 +120,7 @@ services:
       - monitoring
     restart: unless-stopped
 
-  # Sprint 2: Ansible control node (patch orchestration); Sprint 3: metrics on 9101
+  # Ansible control node (patch orchestration; metrics on 9101)
   ansible:
     build:
       context: ./ansible
@@ -141,7 +151,7 @@ services:
       - patch-target-4
       - patch-target-5
 
-  # Sprint 2: Patch target containers (simulated Linux servers with SSH)
+  # Patch target containers (simulated Linux servers with SSH)
   patch-target-1:
     build:
       context: ./ansible/target
@@ -239,6 +249,7 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
   ansible_ssh:
   ssh_pubkey:
   ansible_reports:

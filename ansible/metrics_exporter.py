@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sprint 3: Lightweight HTTP server that serves patch_metrics.prom at /metrics for Prometheus.
+"""Lightweight HTTP server that serves patch_metrics.prom at /metrics for Prometheus.
    Accessible only within Docker network. No auth; no sensitive data."""
 import http.server
 import os

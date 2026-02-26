@@ -1,4 +1,4 @@
-host,changed,rebooted,failed,duration_seconds,timestamp,group,environment
+host,changed,rebooted,failed,rollback_performed,duration_seconds,timestamp,group,environment
 {% for h in (patch_report_list | default([])) %}
-{{ h.host }},{{ h.changed }},{{ h.rebooted }},{{ h.failed }},{{ h.duration_seconds }},{{ h.timestamp }},{{ h.group }},{{ h.environment }}
+{{ h.host }},{{ h.changed }},{{ h.rebooted }},{{ h.failed }},{{ h.rollback_performed | default(false) }},{{ h.duration_seconds }},{{ h.timestamp }},{{ h.group }},{{ h.environment }}
 {% endfor %}

@@ -1,5 +1,5 @@
 ---
-# Sprint 2: Patch dry run (check mode - no changes applied)
+# Patch dry run (check mode - no changes applied)
 - hosts: patch_targets
   tasks:
     - name: Gather facts
