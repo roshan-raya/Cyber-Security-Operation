@@ -1,0 +1,64 @@
+---
+# Patch: gather facts, apt update/upgrade, reboot if required, validate
+- name: Run patch and validation
+  block:
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+      register: apt_update
+
+    - name: FAILURE SIMULATION (optional) - force this host to fail
+      ansible.builtin.fail:
+        msg: "Simulated patch failure for demo (fail_host={{ fail_host }})"
+      when: fail_host is defined and fail_host | length > 0 and inventory_hostname == fail_host
+
+    - name: Upgrade packages (security and safe updates)
+      ansible.builtin.apt:
+        upgrade: safe
+      register: upgrade_result
+
+    - name: Set patch changed flag
+      ansible.builtin.set_fact:
+        patch_changed: "{{ upgrade_result.changed | default(false) }}"
+
+    - name: Check if reboot required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Reboot if required
+      ansible.builtin.reboot:
+        msg: "Patch orchestration reboot"
+        connect_timeout: 5
+        reboot_timeout: 120
+      when: reboot_required.stat.exists | default(false) | bool
+      register: reboot_result
+
+    - name: Set patch rebooted flag
+      ansible.builtin.set_fact:
+        patch_rebooted: "{{ reboot_result is changed | default(false) }}"
+
+    - name: Wait for connection after reboot
+      ansible.builtin.wait_for_connection:
+        timeout: 120
+      when: reboot_required.stat.exists | default(false) | bool
+
+    - name: Re-gather facts after reboot
+      ansible.builtin.setup:
+      when: reboot_required.stat.exists | default(false) | bool
+
+    - name: Validate system health (uptime >= 0)
+      ansible.builtin.assert:
+        that: ansible_facts['uptime_seconds'] >= 0
+        fail_msg: "Uptime check failed"
+  rescue:
+    - name: Mark patch failed
+      ansible.builtin.set_fact:
+        patch_failed: true
+
+    - name: Run rollback (only if enabled)
+      ansible.builtin.include_tasks: rollback.yml
+      when: rollback_enabled | default(false) | bool

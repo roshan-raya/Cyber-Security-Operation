@@ -19,6 +19,9 @@ patch_run_duration_seconds 0
 # HELP patch_last_run_timestamp Unix timestamp of last patch
 # TYPE patch_last_run_timestamp gauge
 patch_last_run_timestamp 0
+# HELP patch_compliance_percentage Patch compliance (success rate) percentage
+# TYPE patch_compliance_percentage gauge
+patch_compliance_percentage 0
 """
 
 

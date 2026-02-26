@@ -26,6 +26,18 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    networks:
+      - monitoring
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:10.4.2
     container_name: grafana
@@ -112,11 +124,12 @@ services:
     profiles:
       - sim
     volumes:
-      - ansible_ssh:/ansible/.ssh
       - ./ansible/playbooks:/ansible/playbooks:ro
       - ./ansible/inventory:/ansible/inventory:ro
-      - ssh_pubkey:/ssh_pubkey
+      - ./ansible/roles:/ansible/roles:ro
       - ansible_reports:/ansible/reports
+      - ansible_ssh:/ansible/.ssh
+      - ssh_pubkey:/ssh_pubkey
     networks:
       - monitoring
     expose:

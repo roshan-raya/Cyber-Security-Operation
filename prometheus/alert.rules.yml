@@ -3,6 +3,18 @@ groups:
     interval: 1m
     rules: []
 
+  - name: patching
+    interval: 1m
+    rules:
+      - alert: PatchComplianceBelow95
+        expr: patch_compliance_percentage < 95
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Patch compliance below 95%"
+          description: "Patch compliance is {{ $value }}% (target >= 95%)."
+
   - name: patch_alerts
     interval: 1m
     rules:
@@ -29,3 +41,30 @@ groups:
           severity: warning
         annotations:
           summary: "No patch run in the last 24 hours"
+
+  - name: patch_alerts_critical
+    interval: 1m
+    rules:
+      - alert: PatchFailureCritical
+        expr: patch_host_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Patch run failed for host {{ $labels.host }} (critical)"
+
+      - alert: PatchHostUnreachable
+        expr: up{job="patch_metrics"} == 0 or absent(up{job="patch_metrics"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Patch metrics exporter unreachable"
+
+      - alert: PatchComplianceLow
+        expr: patch_compliance_percentage < 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Patch compliance below 80% (current: {{ $value }}%)"

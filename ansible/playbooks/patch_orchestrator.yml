@@ -1,0 +1,12 @@
+---
+# Sprint 4: Role-based patch orchestration (common -> health_check -> patch -> reporting)
+# Use *_effective to avoid self-referential vars (patch_environment / patch_group from -e or inventory)
+- hosts: "{{ patch_group_effective }}"
+  vars:
+    patch_environment_effective: "{{ patch_environment | default('unspecified') }}"
+    patch_group_effective: "{{ patch_group | default('all') }}"
+  roles:
+    - common
+    - health_check
+    - patch
+    - reporting

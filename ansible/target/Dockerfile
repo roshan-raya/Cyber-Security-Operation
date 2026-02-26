@@ -28,7 +28,10 @@ RUN mkdir -p /home/devops/.ssh \
 
 RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config \
     && sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
-    && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
+    && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config \
+    && echo 'PermitRootLogin no' >> /etc/ssh/sshd_config \
+    && sed -i 's/#StrictModes yes/StrictModes yes/' /etc/ssh/sshd_config \
+    && grep -q '^StrictModes' /etc/ssh/sshd_config || echo 'StrictModes yes' >> /etc/ssh/sshd_config
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

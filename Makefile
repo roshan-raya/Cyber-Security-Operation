@@ -1,4 +1,4 @@
-.PHONY: up down logs status clean validate lint-prometheus patch patch-dryrun patch-health patch-report metrics-test
+.PHONY: up down logs status clean validate lint-prometheus patch patch-dryrun patch-health patch-report metrics-test patch-staging patch-production patch-blue patch-green
 
 up:
 	docker compose up -d
@@ -32,6 +32,8 @@ validate:
 	  echo "[PASS] Containers running (2/2 monitoring only)"; \
 	elif [ "$$RUNNING" -eq 4 ]; then \
 	  echo "[PASS] Containers running (4/4 with sim)"; \
+	elif [ "$$RUNNING" -ge 12 ]; then \
+	  echo "[PASS] Containers running ($$RUNNING - full sim + Alertmanager)"; \
 	elif [ "$$RUNNING" -ge 11 ]; then \
 	  echo "[PASS] Containers running ($$RUNNING - full sim with Ansible + patch targets)"; \
 	else \
@@ -53,9 +55,12 @@ validate:
 	echo "  - Open Node Overview dashboard and confirm metrics after scrape interval"; \
 	if [ "$$FAIL" -eq 1 ]; then exit 1; fi
 
-# Sprint 2: Ansible patch orchestration (requires: docker compose --profile sim up -d)
+# Sprint 2/4: Ansible patch orchestration (requires: docker compose --profile sim up -d)
+# Default: all targets from inventory/hosts.ini (Sprint 2 backward compatible)
+# Clear stale report artifacts before run so a failed playbook doesn't show old success output
 patch:
-	docker compose exec ansible ansible-playbook playbooks/patch.yml
+	docker compose exec ansible rm -f /ansible/reports/patch_report_latest.json /ansible/reports/patch_metrics.prom
+	docker compose exec ansible ansible-playbook -i inventory/hosts.ini playbooks/patch_orchestrator.yml
 
 patch-dryrun:
 	docker compose exec ansible ansible-playbook playbooks/patch_dryrun.yml
@@ -63,8 +68,22 @@ patch-dryrun:
 patch-health:
 	docker compose exec ansible ansible-playbook playbooks/health_check.yml
 
+# Sprint 4: environment separation
+patch-staging:
+	docker compose exec ansible ansible-playbook -i inventory/staging.ini playbooks/patch_orchestrator.yml -e patch_environment=staging -e patch_group=staging
+
+patch-production:
+	docker compose exec ansible ansible-playbook -i inventory/production.ini playbooks/patch_orchestrator.yml -e patch_environment=production -e patch_group=production
+
+# Sprint 4: blue/green production
+patch-blue:
+	docker compose exec ansible ansible-playbook -i inventory/production.ini playbooks/patch_orchestrator.yml --limit blue -e patch_environment=production -e patch_group=blue
+
+patch-green:
+	docker compose exec ansible ansible-playbook -i inventory/production.ini playbooks/patch_orchestrator.yml --limit green -e patch_environment=production -e patch_group=green
+
 patch-report:
-	@docker compose exec ansible sh -c 'LATEST=$$(ls -t /ansible/reports/patch_report_*.json 2>/dev/null | head -1); if [ -n "$$LATEST" ]; then cat "$$LATEST"; else echo "No report found. Run: make patch"; fi'
+	@docker compose exec ansible sh -c 'if [ -f /ansible/reports/patch_report_latest.json ]; then cat /ansible/reports/patch_report_latest.json; else LATEST=$$(ls -t /ansible/reports/patch_report_*.json 2>/dev/null | head -1); if [ -n "$$LATEST" ]; then cat "$$LATEST"; else echo "No report found. Run: make patch"; fi; fi'
 
 # Sprint 3: test patch metrics exporter (requires: docker compose --profile sim up -d)
 metrics-test:

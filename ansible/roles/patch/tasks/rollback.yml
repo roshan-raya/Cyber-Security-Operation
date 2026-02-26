@@ -1,0 +1,12 @@
+---
+# Rollback: reinstall baseline package versions (demo)
+- name: Rollback - reinstall baseline package versions (demo)
+  ansible.builtin.apt:
+    name: "{{ rollback_packages }}"
+    state: present
+    allow_downgrade: true
+    update_cache: true
+
+- name: Rollback marker
+  ansible.builtin.set_fact:
+    rollback_performed: true

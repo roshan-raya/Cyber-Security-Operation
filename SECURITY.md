@@ -67,3 +67,12 @@ Baseline security considerations for the Sprint 1 monitoring stack and future ex
 Ensure host and/or cloud firewalls align with this. Document any exceptions and review periodically.
 
 **Sprint 1 scope:** Node-exporter metrics in this repository are **container-scoped** (two simulated nodes in Docker). Later sprints will deploy node_exporter to **real Linux nodes** in the data centres; firewall and network design will apply to those targets.
+
+---
+
+## 8. Sprint 4 hardening
+
+- **Key persistence:** The Ansible container uses a dedicated Docker volume (`ansible_ssh`) for `/ansible/.ssh`. The SSH key is generated once and reused across container restarts and rebuilds; it is never committed to the repo. Rotate by removing the volume and redeploying, or by injecting a new key from a secrets manager.
+- **Metrics internal-only:** The patch metrics exporter (port 9101) is not published to the host; only Prometheus and other services on the `monitoring` network can scrape it. No authentication is required on the exporter; rely on network isolation in production.
+- **Production TLS recommendation:** Expose Prometheus and Grafana only via a reverse proxy (e.g. nginx, Traefik) with TLS termination and access control. Do not publish Alertmanager or the metrics exporter to the internet. Use TLS for all operator-facing endpoints.
+- **Patch targets:** Root SSH login is disabled (`PermitRootLogin no`); `StrictModes yes` is set. Ansible runs as non-root and uses `ansible_become: true` (sudo) for privileged tasks only.

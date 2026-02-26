@@ -6,6 +6,12 @@ global:
 rule_files:
   - /etc/prometheus/alert.rules.yml
 
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
 scrape_configs:
   - job_name: prometheus
     static_configs:
@@ -27,3 +33,10 @@ scrape_configs:
           - ansible:9101
         labels:
           role: patch-orchestration
+
+  - job_name: alertmanager
+    static_configs:
+      - targets:
+          - alertmanager:9093
+        labels:
+          role: alertmanager

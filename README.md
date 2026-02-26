@@ -1,10 +1,12 @@
-# Enterprise Patch Management & Monitoring Platform — Sprint 1
+# Enterprise Automated Patch Management Platform
+
+![CI](https://github.com/YOUR_GITHUB_OWNER/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
 
 Production-ready repository for automated patch management and monitoring of a multiplayer game infrastructure (300+ Linux servers across two data centres). Sprint 1 delivers the **foundation and architecture**: Docker-based monitoring baseline with Prometheus, Grafana, and simulated node exporters.
 
 All work is Infrastructure-as-Code, version controlled, and documented.
 
-**Sprint 1.1** adds hardening: version-pinned images, healthchecks, improved `make validate`, and secure-by-default Grafana settings. **Sprint 2** adds Ansible patch orchestration: an Ansible control container and 5 Docker-based SSH patch targets (Ubuntu, devops user, key-based auth) on the same monitoring network. **Sprint 3** adds monitoring integration: patch metrics exported to Prometheus (duration, per-host success/changed, last run timestamp), alert rules (PatchFailure, PatchDurationTooHigh, PatchNotRunRecently), and Node Overview dashboard panels. The metrics exporter listens on port 9101 inside the Docker network only. Node-exporter metrics are **container-scoped** (simulated); patch targets are simulated Linux servers for automation testing.
+**Sprint 1.1** adds hardening: version-pinned images, healthchecks, improved `make validate`, and secure-by-default Grafana settings. **Sprint 2** adds Ansible patch orchestration: an Ansible control container and 5 Docker-based SSH patch targets (Ubuntu, devops user, key-based auth) on the same monitoring network. **Sprint 3** adds monitoring integration: patch metrics exported to Prometheus, alert rules, and Node Overview dashboard panels. **Sprint 4** adds enterprise features: role-based Ansible (common, health_check, patch, reporting), environment separation (staging/production inventories), blue/green production patching, Alertmanager, compliance reporting (latest JSON/CSV, patch_compliance_percentage), GitHub Actions (push/manual/nightly), security hardening (root SSH disabled, StrictModes), and Grafana panels (Compliance %, Failed Hosts, Blue/Green Success %, environment filter). Node-exporter metrics are **container-scoped** (simulated); patch targets are simulated Linux servers for automation testing.
 
 ---
 
@@ -71,9 +73,13 @@ All work is Infrastructure-as-Code, version controlled, and documented.
 | `make lint-prometheus` | Lint Prometheus config and rules (requires stack up). |
 | `make patch-health` | (Sprint 2) Run Ansible health_check playbook on patch targets. Requires `make up-sim`. |
 | `make patch-dryrun` | (Sprint 2) Run patch playbook in check mode. |
-| `make patch` | (Sprint 2) Run full patch playbook (apt update/upgrade, reboot if needed, report). |
-| `make patch-report` | (Sprint 2) Print latest patch report JSON from Ansible container. |
-| `make metrics-test` | (Sprint 3) Curl patch metrics from Ansible exporter (http://localhost:9101/metrics inside container). Requires `make up-sim`. |
+| `make patch` | (Sprint 2/4) Run role-based patch orchestration (all targets from default inventory). |
+| `make patch-staging` | (Sprint 4) Patch staging only (patch-target-1, 2). |
+| `make patch-production` | (Sprint 4) Patch production only (patch-target-3, 4, 5). |
+| `make patch-blue` | (Sprint 4) Patch blue group only (patch-target-3, 4). |
+| `make patch-green` | (Sprint 4) Patch green group only (patch-target-5). |
+| `make patch-report` | (Sprint 2) Print latest patch report JSON (patch_report_latest.json or latest timestamped). |
+| `make metrics-test` | (Sprint 3) Curl patch metrics from Ansible exporter. Requires `make up-sim`. |
 
 ---
 
@@ -88,7 +94,7 @@ docker compose up -d          # or: make up-sim for full stack with sim nodes
 make validate
 ```
 
-**Checks:** (1) Containers running (2 = monitoring only, 4 = with sim profile), (2) Prometheus ready endpoint returns 200, (3) Grafana health returns 200. Each check prints `[PASS]` or `[FAIL]`; if any fail, `make validate` exits with non-zero. See **Healthchecks** in docs/Sprint1_Runbook.md for details.
+**Checks:** (1) Containers running (2 = monitoring only, 4 = sim without Ansible/patch targets, 11+ = full sim, 12+ with Alertmanager), (2) Prometheus ready, (3) Grafana health. Each check prints `[PASS]` or `[FAIL]`. See **Healthchecks** in docs/Sprint1_Runbook.md and **docs/Sprint4_Enterprise.md** for Sprint 4.
 
 ### 1. Start and check containers
 
@@ -178,6 +184,7 @@ See **SECURITY.md** for baseline security considerations (least privilege, secre
 - **docs/Sprint2_Automation.md** — Ansible patch orchestration, SSH, concurrency, reporting.
 - **docs/Sprint2_Testing.md** — Validation steps, example report, failure scenarios.
 - **docs/Sprint3_Monitoring.md** — Patch metrics, Prometheus scrape, alert rules, dashboard panels, validation, risks.
+- **docs/Sprint4_Enterprise.md** — Role-based Ansible, staging/production, blue/green, Alertmanager, CI/CD, compliance, security.
 
 ---
 
