@@ -84,6 +84,14 @@ Reporting and metrics include `group` (blue/green/all). Dashboards show Blue Suc
 3. Alertmanager routes by severity; receiver `console` is configured (webhook_configs empty; add Slack/email in production).
 4. **New rules:** PatchFailureCritical (patch_host_success == 0, 2m), PatchHostUnreachable (patch_metrics down), PatchComplianceLow (patch_compliance_percentage < 80%).
 
+### Prometheus Alert Evidence
+
+The `PatchComplianceBelow95` alert triggers automatically when compliance drops below 95%.
+
+![Prometheus Alert Proof](screenshots/prometheus_alert_proof.png)
+
+*To capture: run failure simulation (`-e fail_host=patch-target-3`), then open http://localhost:9090 → Status → Alerts and save a screenshot as `docs/screenshots/prometheus_alert_proof.png`.*
+
 ---
 
 ## 6. CI/CD workflow
