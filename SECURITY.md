@@ -1,6 +1,6 @@
 # Security Considerations — Patch Management & Monitoring Platform
 
-Baseline security considerations for the Sprint 1 monitoring stack and future expansion. Apply in line with your organisation’s policies and compliance requirements.
+Baseline security considerations for the monitoring stack and patch platform. Apply in line with your organisation’s policies and compliance requirements.
 
 ---
 
@@ -18,9 +18,9 @@ Baseline security considerations for the Sprint 1 monitoring stack and future ex
 - **Use `.env.example`** as a template only; copy to `.env` and set strong, unique values. In production, use a secrets manager (e.g. HashiCorp Vault, cloud provider secrets) and inject env vars at deploy time.
 - **Recommendation:** Rotate Grafana admin credentials regularly; use LDAP/OAuth/SSO when Grafana is deployed in production.
 
-**Sprint 2 (Ansible):** SSH keys are generated inside the Ansible container on first run and the public key is shared to patch targets via a Docker volume. No keys are committed to the repo. For production, use a dedicated SSH key (or key per environment) from a secrets manager and inject into the Ansible container; document key rotation and scope in runbooks.
+**Ansible:** SSH keys are generated inside the Ansible container on first run and the public key is shared to patch targets via a Docker volume. No keys are committed to the repo. For production, use a dedicated SSH key (or key per environment) from a secrets manager and inject into the Ansible container; document key rotation and scope in runbooks.
 
-**Sprint 3 (Patch metrics):** The metrics exporter (port 9101) is exposed only on the Docker network; no host publish. Metrics contain no secrets (duration, success/changed flags, timestamp; host labels are inventory hostnames). For production, keep the exporter internal or put it behind a reverse proxy with access control.
+**Patch metrics:** The metrics exporter (port 9101) is exposed only on the Docker network; no host publish. Metrics contain no secrets (duration, success/changed flags, timestamp; host labels are inventory hostnames). For production, keep the exporter internal or put it behind a reverse proxy with access control.
 
 ---
 
@@ -66,11 +66,11 @@ Baseline security considerations for the Sprint 1 monitoring stack and future ex
 
 Ensure host and/or cloud firewalls align with this. Document any exceptions and review periodically.
 
-**Sprint 1 scope:** Node-exporter metrics in this repository are **container-scoped** (two simulated nodes in Docker). Later sprints will deploy node_exporter to **real Linux nodes** in the data centres; firewall and network design will apply to those targets.
+Node-exporter metrics in this repository are **container-scoped** (two simulated nodes in Docker). For real Linux nodes, firewall and network design will apply to those targets.
 
 ---
 
-## 8. Sprint 4 hardening
+## 8. Patch platform hardening
 
 - **Key persistence:** The Ansible container uses a dedicated Docker volume (`ansible_ssh`) for `/ansible/.ssh`. The SSH key is generated once and reused across container restarts and rebuilds; it is never committed to the repo. Rotate by removing the volume and redeploying, or by injecting a new key from a secrets manager.
 - **Metrics internal-only:** The patch metrics exporter (port 9101) is not published to the host; only Prometheus and other services on the `monitoring` network can scrape it. No authentication is required on the exporter; rely on network isolation in production.

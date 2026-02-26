@@ -1,12 +1,27 @@
 ---
-# Sprint 4: Role-based patch orchestration (common -> health_check -> patch -> reporting)
-# Use *_effective to avoid self-referential vars (patch_environment / patch_group from -e or inventory)
-- hosts: "{{ patch_group_effective }}"
+# ===============================
+# Play 1: Patch All Targets
+# ===============================
+- name: Patch all hosts
+  hosts: all
+  strategy: free
+  gather_facts: true
+
   vars:
-    patch_environment_effective: "{{ patch_environment | default('unspecified') }}"
-    patch_group_effective: "{{ patch_group | default('all') }}"
+    patch_group: "{{ patch_group | default('all') }}"
+
   roles:
     - common
     - health_check
     - patch
+
+
+# ===============================
+# Play 2: Reporting (Single Host)
+# ===============================
+- name: Generate patch reports
+  hosts: localhost
+  gather_facts: false
+
+  roles:
     - reporting

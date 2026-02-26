@@ -1,18 +1,18 @@
 ---
+# Reporting runs on localhost (play 2); uses hostvars + groups['all'] for data
+- name: Gather facts (for timestamp/duration)
+  ansible.builtin.setup:
+
 - name: Ensure reports directory exists
   ansible.builtin.file:
     path: /ansible/reports
     state: directory
     mode: "0755"
-  run_once: true
-  delegate_to: localhost
 
-- name: Get patch start epoch for reporting (from first host in run)
+- name: Get patch start epoch for reporting (from first host in inventory)
   ansible.builtin.set_fact:
-    patch_start_epoch: "{{ hostvars[(ansible_play_batch | first)]['patch_start_epoch'] | default(ansible_facts['date_time']['epoch']) }}"
-  run_once: true
-  delegate_to: localhost
-  when: (ansible_play_batch | default([]) | length) > 0
+    patch_start_epoch: "{{ hostvars[groups['all'][0]]['patch_start_epoch'] | default(ansible_facts['date_time']['epoch']) }}"
+  when: groups['all'] | default([]) | length > 0
 
 - name: Build report list per host
   ansible.builtin.set_fact:
@@ -25,50 +25,38 @@
       failed: "{{ hostvars[item].patch_failed | default(false) }}"
       msg: "{{ hostvars[item].patch_msg | default('') }}"
       rebooted: "{{ hostvars[item].patch_rebooted | default(false) }}"
+      rollback_performed: "{{ hostvars[item].rollback_performed | default(false) }}"
       duration_seconds: "{{ ansible_facts['date_time']['epoch'] | int - (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int) }}"
       timestamp: "{{ ansible_facts['date_time']['epoch'] }}"
-      group: "{{ patch_group_effective | default('all') }}"
-      environment: "{{ patch_environment_effective | default('unspecified') }}"
-  loop: "{{ ansible_play_batch | default([]) }}"
-  when: (ansible_play_batch | default([]) | length) > 0
-  run_once: true
-  delegate_to: localhost
+      group: "{{ patch_group | default('all') }}"
+      environment: "{{ patch_environment | default('unspecified') }}"
+  loop: "{{ groups['all'] | default([]) }}"
+  when: groups['all'] | default([]) | length > 0
 
 - name: Set patch compliance percentage
   ansible.builtin.set_fact:
     patch_compliance_percentage: "{{ ((patch_report_list | selectattr('failed', 'equalto', false) | list | length) / (patch_report_list | length) * 100.0) | round(2) if (patch_report_list | length) > 0 else 0 }}"
-  run_once: true
-  delegate_to: localhost
 
 - name: Write patch report JSON (timestamped)
   ansible.builtin.copy:
     content: "{{ {'hosts': patch_report_list | default([]), 'duration_seconds': (ansible_facts['date_time']['epoch'] | int - (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int)), 'environment': patch_environment | default('unspecified'), 'group': patch_group | default('all'), 'compliance_percentage': patch_compliance_percentage | default(0)} | to_nice_json }}"
     dest: "/ansible/reports/patch_report_{{ ansible_facts['date_time']['epoch'] }}.json"
-  run_once: true
-  delegate_to: localhost
 
 - name: Write patch_report_latest.json
   ansible.builtin.copy:
     content: "{{ {'hosts': patch_report_list | default([]), 'duration_seconds': (ansible_facts['date_time']['epoch'] | int - (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int)), 'environment': patch_environment | default('unspecified'), 'group': patch_group | default('all'), 'compliance_percentage': patch_compliance_percentage | default(0)} | to_nice_json }}"
     dest: "/ansible/reports/patch_report_latest.json"
-  run_once: true
-  delegate_to: localhost
 
 - name: Write patch_report_latest.csv
   ansible.builtin.template:
     src: patch_report.csv.j2
     dest: /ansible/reports/patch_report_latest.csv
-  run_once: true
-  delegate_to: localhost
 
 - name: Generate Prometheus patch metrics file
   ansible.builtin.template:
     src: patch_metrics.prom.j2
     dest: /ansible/reports/patch_metrics.prom
-  run_once: true
-  delegate_to: localhost
 
 - name: Structured summary
   ansible.builtin.debug:
     msg: "Patch run complete. Report: /ansible/reports/patch_report_latest.json (env={{ patch_environment | default('unspecified') }}, group={{ patch_group | default('all') }})"
-  run_once: true

@@ -1,5 +1,5 @@
 ---
-# Sprint 2: Health check - SSH connectivity, uptime, sshd service
+# Health check: SSH connectivity, uptime, sshd service
 - hosts: patch_targets
   tasks:
     - name: Ping (connection check)

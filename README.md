@@ -2,145 +2,186 @@
 
 ![CI](https://github.com/YOUR_GITHUB_OWNER/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
 
-Production-ready repository for automated patch management and monitoring of a multiplayer game infrastructure (300+ Linux servers across two data centres). Sprint 1 delivers the **foundation and architecture**: Docker-based monitoring baseline with Prometheus, Grafana, and simulated node exporters.
-
-All work is Infrastructure-as-Code, version controlled, and documented.
-
-**Sprint 1.1** adds hardening: version-pinned images, healthchecks, improved `make validate`, and secure-by-default Grafana settings. **Sprint 2** adds Ansible patch orchestration: an Ansible control container and 5 Docker-based SSH patch targets (Ubuntu, devops user, key-based auth) on the same monitoring network. **Sprint 3** adds monitoring integration: patch metrics exported to Prometheus, alert rules, and Node Overview dashboard panels. **Sprint 4** adds enterprise features: role-based Ansible (common, health_check, patch, reporting), environment separation (staging/production inventories), blue/green production patching, Alertmanager, compliance reporting (latest JSON/CSV, patch_compliance_percentage), GitHub Actions (push/manual/nightly), security hardening (root SSH disabled, StrictModes), and Grafana panels (Compliance %, Failed Hosts, Blue/Green Success %, environment filter). Node-exporter metrics are **container-scoped** (simulated); patch targets are simulated Linux servers for automation testing.
+Production-ready Dockerised patch orchestration with Ansible, Prometheus, Grafana, and automated rollback. One file: architecture + setup on any laptop.
 
 ---
 
-## Quick Start
-
-1. **Copy environment file and set Grafana admin password**
-   ```bash
-   cp .env.example .env
-   # Edit .env and set GF_SECURITY_ADMIN_PASSWORD (and optionally GF_SECURITY_ADMIN_USER)
-   ```
-
-2. **Start the stack**
-   - Monitoring only (Prometheus + Grafana): `docker compose up -d` or `make up`
-   - Full stack (monitoring + node exporters + Ansible + 5 patch targets): `docker compose --profile sim up -d` or `make up-sim`
-
-3. **Verify**
-   - Prometheus: http://localhost:9090
-   - Grafana: http://localhost:3000 (login with credentials from `.env`)
-   - See [Validation](#validation) below for full checks.
-
----
-
-## Project Structure
+## Architecture
 
 ```
-/project-root
-  docker-compose.yml
-  Makefile
-  .env.example
-  .gitignore
-  README.md
-  SECURITY.md
-  /prometheus
-    prometheus.yml
-    alert.rules.yml
-  /grafana
-    /provisioning
-      /datasources
-        datasource.yml
-      /dashboards
-        dashboards.yml
-        node-overview.json
-  /ansible
-    /playbooks
-    /inventory
-  /docs
-    Sprint1_Architecture.md
-    Sprint1_Runbook.md
+                    +------------------+
+                    |  GitHub Actions  |
+                    |  (push/cron)     |
+                    +--------+---------+
+                             | docker compose --profile sim up -d; make patch
+                             v
++----------------+    +----------------+    +----------------+
+|   Prometheus   |<---|    Ansible     |--->| 5 Patch Targets|
+|   :9090        |    | (common,       |    | (dev/staging/  |
+|   + Alerting   |    |  health_check,  |    |  prod blue/    |
+|   -> Alertmgr  |    |  patch, report)|    |  green)        |
++--------+-------+    +--------+-------+    +----------------+
+         |                    | metrics :9101
+         | scrape              v
+         v             +----------------+
++----------------+    | patch_metrics   |
+|  Alertmanager  |    | (compliance %,  |
+|  :9093         |    |  env, group)    |
++--------+-------+    +----------------+
+         |
+         v
++----------------+
+|    Grafana     |
+|  :3000         |
+|  Node Overview |
++----------------+
+```
+
+- **Prometheus** scrapes itself, node-exporters, patch_metrics, alertmanager (5m interval).
+- **Ansible** runs patch orchestration (roles: common → health_check → patch → reporting); writes JSON/CSV and exposes metrics for Prometheus.
+- **Alertmanager** receives firing alerts (e.g. PatchComplianceBelow95); can route to Slack/email.
+- **Grafana** uses Prometheus; Node Overview shows Compliance %, Patch duration, Failed hosts, CPU/Memory, Blue/Green %.
+
+---
+
+## Project structure
+
+```
+/
+  docker-compose.yml    # Prometheus, Grafana, Alertmanager, ansible, 5 patch targets (sim profile)
+  Makefile              # up, patch, validate, ENV= / LIMIT=
+  .env.example          # Copy to .env (Grafana credentials)
+  README.md             # This file
+  SECURITY.md           # Security notes
+  prometheus/           # prometheus.yml, alert.rules.yml
+  grafana/provisioning/ # datasources, dashboards (Node Overview)
+  alertmanager/         # alertmanager.yml (console + Slack/email)
+  ansible/
+    playbooks/          # patch_orchestrator.yml, drift_check.yml
+    roles/              # common, health_check, patch, reporting
+    inventory/          # hosts.ini, dev.ini, staging.ini, prod.ini (blue/green)
+  .github/workflows/    # ci.yml (lint, build, patch, validate)
 ```
 
 ---
 
-## Makefile Commands
+## Setup on a new laptop
 
-| Command   | Description                          |
-|----------|--------------------------------------|
-| `make up`     | Start monitoring stack only (Prometheus + Grafana) |
-| `make up-sim` | Start full stack including simulated node exporters (`--profile sim`) |
-| `make down`   | Stop all services                    |
-| `make logs`   | Follow container logs                |
-| `make status` | Show container status                |
-| `make clean`  | Stop and remove containers and volumes |
-| `make validate` | Run validation: containers (2, 4, or 11+), Prometheus ready (200), Grafana health (200); outputs PASS/FAIL. |
-| `make lint-prometheus` | Lint Prometheus config and rules (requires stack up). |
-| `make patch-health` | (Sprint 2) Run Ansible health_check playbook on patch targets. Requires `make up-sim`. |
-| `make patch-dryrun` | (Sprint 2) Run patch playbook in check mode. |
-| `make patch` | (Sprint 2/4) Run role-based patch orchestration (all targets from default inventory). |
-| `make patch-staging` | (Sprint 4) Patch staging only (patch-target-1, 2). |
-| `make patch-production` | (Sprint 4) Patch production only (patch-target-3, 4, 5). |
-| `make patch-blue` | (Sprint 4) Patch blue group only (patch-target-3, 4). |
-| `make patch-green` | (Sprint 4) Patch green group only (patch-target-5). |
-| `make patch-report` | (Sprint 2) Print latest patch report JSON (patch_report_latest.json or latest timestamped). |
-| `make metrics-test` | (Sprint 3) Curl patch metrics from Ansible exporter. Requires `make up-sim`. |
+### Prerequisites
 
----
+- **Docker** and **Docker Compose** (Docker Compose v2)
+- **Make** (optional; you can run the underlying `docker compose` / `ansible-playbook` commands manually)
+- **Git** (to clone the repo)
 
-## Validation
-
-Run automated checks and optional manual steps.
-
-### Automated: `make validate`
+### Step 1 — Clone and enter project
 
 ```bash
-docker compose up -d          # or: make up-sim for full stack with sim nodes
-make validate
+git clone <your-repo-url> CSOPROJECT
+cd CSOPROJECT
 ```
 
-**Checks:** (1) Containers running (2 = monitoring only, 4 = sim without Ansible/patch targets, 11+ = full sim, 12+ with Alertmanager), (2) Prometheus ready, (3) Grafana health. Each check prints `[PASS]` or `[FAIL]`. See **Healthchecks** in docs/Sprint1_Runbook.md and **docs/Sprint4_Enterprise.md** for Sprint 4.
-
-### 1. Start and check containers
+### Step 2 — Environment file
 
 ```bash
-docker compose up -d           # monitoring only
-docker compose --profile sim up -d   # include simulated node exporters
+cp .env.example .env
+```
+
+Edit `.env` and set at least:
+
+- `GF_SECURITY_ADMIN_PASSWORD` (Grafana admin password)
+- Optionally `GF_SECURITY_ADMIN_USER` (default: `admin`)
+
+### Step 3 — Start the stack
+
+**Monitoring only (Prometheus + Grafana):**
+
+```bash
+docker compose up -d
+```
+
+**Full stack (monitoring + node exporters + Ansible + 5 patch targets):**
+
+```bash
+docker compose --profile sim up -d
+```
+
+Or:
+
+```bash
+make up-sim
+```
+
+Wait until containers are healthy (e.g. 30–60 seconds). Check:
+
+```bash
 docker compose ps
 ```
 
-**Expected:** With `up -d`: two containers (prometheus, grafana). With `--profile sim`: four containers (prometheus, grafana, node-exporter-1, node-exporter-2). Prometheus and Grafana show as `healthy` once their healthchecks pass.
+### Step 4 — Run patch orchestration
 
-### 2. Prometheus readiness
+With the full stack up:
 
 ```bash
-curl http://localhost:9090/-/ready
+make patch
 ```
 
-**Expected:** HTTP 200, no error.
+This runs the Ansible playbook on all patch targets, generates reports, and updates metrics.
 
-### 3. Prometheus targets
+### Step 5 — Validate
 
-Open in a browser: **http://localhost:9090/targets**
+```bash
+make validate        # Containers, Prometheus ready, Grafana health
+make validate-reports   # Reports exist, compliance ≥95%, duration ≤2h, no failed hosts
+```
 
-**Expected:** With monitoring only: 1 target (prometheus). With `--profile sim`: 4 targets, all **UP** — `prometheus`, `node-exporter` (×2), `patch_metrics` (ansible:9101).
+Expect: `[PASS]` and `Validation: PASS`.
 
-### 4. Grafana
+### Step 6 — Open UIs
 
-- Open **http://localhost:3000**
-- Login with:
-  - **User:** value of `GF_SECURITY_ADMIN_USER` in `.env` (default `admin`)
-  - **Password:** value of `GF_SECURITY_ADMIN_PASSWORD` in `.env` (default `changeme`)
+- **Prometheus:** http://localhost:9090 (targets, alerts, query `patch_host_success`, `patch_compliance_percentage`)
+- **Grafana:** http://localhost:3000 — login with `.env` credentials → Dashboards → **Node Overview** (use time range “Last 15 minutes” for CPU)
 
-**Expected:** Grafana home loads; no login error.
+---
 
-### 5. Dashboard and metrics
+## Make commands (reference)
 
-- Go to **Dashboards** (left menu) → open **Node Overview**.
-- **Expected:** Dashboard loads and shows:
-  - **Targets Up** (stat): values for Prometheus and both node exporters.
-  - **CPU Usage %** (time series) for each node.
-  - **Memory Usage %** (time series) for each node.
-- **Sprint 3:** Patch Run Duration, Last Patch Timestamp, Patch Success Rate %, Per-host Patch Success (after `make patch`). Run `make metrics-test` to verify the metrics exporter.
+| Command | Description |
+|--------|-------------|
+| `make up` | Start monitoring only (Prometheus + Grafana) |
+| `make up-sim` | Start full stack (sim profile: node exporters + Ansible + 5 patch targets) |
+| `make down` | Stop all services |
+| `make patch` | Run patch orchestration (default inventory) |
+| `make patch ENV=prod` | Patch using `inventory/prod.ini` (ENV=dev, staging, or prod) |
+| `make patch ENV=prod LIMIT=blue` | Patch prod Blue group only; then `LIMIT=green` for Green |
+| `make patch-staging` | Patch staging only |
+| `make patch-blue` / `make patch-green` | Patch blue or green group (production inventory) |
+| `make patch-canary` | Patch canary host first, then all |
+| `make patch-drift` | Drift detection (packages) |
+| `make patch-immutable` | Recreate patch-target-1 then run patch |
+| `make patch-report` | Print latest patch report JSON |
+| `make patch-health` | Run health_check playbook |
+| `make validate` | Check containers, Prometheus, Grafana |
+| `make validate-reports` | Check reports, compliance ≥95%, duration ≤2h, no failed hosts |
+| `make metrics-test` | Curl patch metrics from exporter |
+| `make lint-prometheus` | Lint Prometheus config and rules |
+| `make clean` | Down and remove volumes |
 
-If panels show “No data”:
-- Wait 1–2 scrape cycles (default scrape interval is 5 minutes; see [Troubleshooting](#troubleshooting)).
-- Ensure targets are UP in http://localhost:9090/targets (including `patch_metrics` when using sim).
+---
+
+## Validation checklist (after setup)
+
+Run in order:
+
+```bash
+docker compose --profile sim up -d
+make patch
+make validate-reports
+```
+
+Then:
+
+- **Prometheus** http://localhost:9090/targets — prometheus, node-exporter, patch_metrics, alertmanager **UP**
+- **Grafana** http://localhost:3000 — Node Overview shows Compliance %, Patch duration, Failed hosts, CPU/Memory
 
 ---
 
@@ -148,43 +189,25 @@ If panels show “No data”:
 
 | Issue | What to check |
 |-------|----------------|
-| **Containers not starting** | `docker compose logs`; ensure ports 3000 and 9090 are free. |
-| **Prometheus not ready** | `docker compose logs prometheus`; confirm `prometheus.yml` and `alert.rules.yml` mount correctly. |
-| **Targets down** | Same Docker network: `docker network inspect csoproject_monitoring` (or your project name); node exporters must be reachable at `node-exporter-1:9100`, `node-exporter-2:9100`. |
-| **Grafana login fails** | Credentials must match `.env` (`GF_SECURITY_ADMIN_USER`, `GF_SECURITY_ADMIN_PASSWORD`). If `.env` is missing, copy from `.env.example`. |
-| **Dashboard “No data”** | 1) All 3 targets UP in Prometheus. 2) Default scrape interval is 5m — wait a few minutes or temporarily reduce `scrape_interval` in `prometheus/prometheus.yml` (see comment in file) for testing. 3) In Grafana, check Data source “Prometheus” is working (Explore → run query `up`). |
-
-### Reducing scrape interval for testing
-
-In `prometheus/prometheus.yml`, under the relevant `scrape_configs` job, add for example:
-
-```yaml
-scrape_interval: 30s
-```
-
-Reload Prometheus config (lifecycle API) or restart the container. Revert to 5m for production alignment.
+| Containers not starting | `docker compose logs`; free ports 3000, 9090 |
+| Prometheus not ready | `docker compose logs prometheus`; config/alert rules mounted |
+| Targets down | Same Docker network; `docker network inspect …_monitoring` |
+| Grafana login fails | Credentials in `.env` match (user/password) |
+| Dashboard “No data” | Targets UP in Prometheus; wait 1–2 scrape cycles (5m); Grafana time range e.g. “Last 15 minutes” for CPU |
+| `make patch` fails | Full stack up (`make up-sim`); ansible container has inventory + roles mounted |
+| "removal of container is already in progress" / "service ansible is not running" | Run `docker compose --profile sim down`, wait a few seconds, then `docker compose --profile sim up -d` and retry |
 
 ---
-
-## Version pinning and healthchecks
-
-- **Image versions** are pinned in `docker-compose.yml` (e.g. `prom/prometheus:v2.52.0`, `grafana/grafana:10.4.2`, `prom/node-exporter:v1.8.0`) for **reproducibility** and controlled upgrades. See SECURITY.md for rationale.
-- **Healthchecks:** Prometheus uses `http://localhost:9090/-/ready`; Grafana uses `http://localhost:3000/api/health`. Grafana starts only after Prometheus is healthy (`depends_on: prometheus: condition: service_healthy`).
 
 ## Security
 
-See **SECURITY.md** for baseline security considerations (least privilege, secrets, networking, firewall, version pinning).
+See **SECURITY.md** for least privilege, secrets, networking, and version pinning. Summary: no root SSH on patch targets; metrics internal-only; use TLS and secrets management in production.
 
 ---
 
-## Documentation
+## CI badge
 
-- **docs/Sprint1_Architecture.md** — Architecture and design for Sprint 1.
-- **docs/Sprint1_Runbook.md** — Operational runbook for monitoring stack.
-- **docs/Sprint2_Automation.md** — Ansible patch orchestration, SSH, concurrency, reporting.
-- **docs/Sprint2_Testing.md** — Validation steps, example report, failure scenarios.
-- **docs/Sprint3_Monitoring.md** — Patch metrics, Prometheus scrape, alert rules, dashboard panels, validation, risks.
-- **docs/Sprint4_Enterprise.md** — Role-based Ansible, staging/production, blue/green, Alertmanager, CI/CD, compliance, security.
+Replace `YOUR_GITHUB_OWNER` and `YOUR_REPO` in the badge URL at the top with your GitHub org/repo so the badge shows your workflow status.
 
 ---
 

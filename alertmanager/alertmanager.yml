@@ -1,3 +1,4 @@
+# Alertmanager: console receiver (always works). For production add Slack/email and set api_url, SMTP_*.
 global:
   resolve_timeout: 5m
 
@@ -7,13 +8,7 @@ route:
   group_interval: 10s
   repeat_interval: 12h
   receiver: 'console'
-  routes:
-    - match:
-        severity: critical
-      receiver: 'console'
-      continue: true
 
 receivers:
   - name: 'console'
-    # Placeholder: in production, replace with Slack/email/webhook
     webhook_configs: []
