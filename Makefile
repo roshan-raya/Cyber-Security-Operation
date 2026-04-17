@@ -1,4 +1,4 @@
-.PHONY: up down logs status clean validate validate-reports lint-prometheus patch patch-dryrun patch-health patch-report metrics-test patch-staging patch-production patch-blue patch-green patch-canary patch-immutable patch-drift
+.PHONY: up down logs status clean validate validate-reports lint-prometheus patch patch-dryrun patch-health patch-report metrics-test patch-staging patch-production patch-blue patch-green patch-canary patch-immutable patch-drift thehive-up thehive-init thehive-init-force thehive-rekey thehive-canonicalize-templates thehive-templates thehive-setup thehive-status thehive-logs misp-up misp-status misp-init misp-feeds misp-verify misp-reset-login-lockout misp-integration-test misp-setup misp-logs cortex-up cortex-status cortex-init cortex-analysers cortex-connect-thehive cortex-verify cortex-setup cortex-logs ingest-alerts ingest-alerts-dry enrich-alerts export-iocs kpi-report kpi-prometheus
 
 up:
 	docker compose up -d
@@ -127,3 +127,116 @@ patch-report:
 # Test patch metrics exporter
 metrics-test:
 	@docker compose exec ansible curl -sf http://localhost:9101/metrics || (echo "Metrics exporter not reachable. Is ansible container up?"; exit 1)
+
+thehive-up:
+	docker compose up -d cassandra thehive
+	@echo "Waiting for TheHive to start (this takes ~2 minutes)..."
+	@sleep 120
+
+thehive-init:
+	python3 thehive/setup/init_thehive.py
+
+thehive-init-force:
+	python3 thehive/setup/init_thehive.py --force
+
+thehive-rekey:
+	python3 thehive/setup/init_thehive.py --rekey-only
+
+thehive-canonicalize-templates:
+	python3 thehive/setup/canonicalize_templates.py
+
+thehive-templates:
+	python3 thehive/setup/import_templates.py
+
+thehive-setup: thehive-up thehive-init thehive-templates
+	@echo "TheHive setup complete. Access at http://localhost:9000"
+
+thehive-status:
+	@code=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/api/v1/status); \
+	if [ "$$code" = "200" ] || [ "$$code" = "401" ]; then \
+	  echo "{ \"status\": \"reachable\", \"http_code\": $$code, \"endpoint\": \"/api/v1/status\" }" | python3 -m json.tool; \
+	else \
+	  echo "TheHive not reachable"; \
+	fi
+
+thehive-logs:
+	docker compose logs -f thehive cassandra
+
+misp-up:
+	docker compose up -d misp-db misp-redis misp-modules misp
+	@echo "Waiting for MISP to initialise (this takes 3-5 minutes)..."
+	@sleep 180
+
+misp-status:
+	@curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/users/login \
+	  && echo " MISP reachable at http://localhost:8080" \
+	  || echo "MISP not reachable"
+
+misp-init:
+	python3 misp/setup/init_misp.py
+
+misp-feeds:
+	python3 misp/setup/configure_feeds.py
+
+misp-verify:
+	python3 misp/setup/verify_misp.py
+
+# Clears MISP brute-force / login throttling (MySQL table bruteforces). Use after "maximum login attempts" lockout.
+misp-reset-login-lockout:
+	@docker compose exec -T misp-db sh -c 'mysql -umisp -p"$$MYSQL_PASSWORD" misp -e "DELETE FROM bruteforces;"'
+	@echo "MISP login lockout cleared (bruteforces table emptied)."
+
+misp-integration-test:
+	python3 misp/setup/misp_thehive_integration.py
+
+misp-setup: misp-up misp-init misp-feeds misp-verify
+	@echo "MISP setup complete. Access at http://localhost:8080"
+
+misp-logs:
+	docker compose logs -f misp misp-db misp-redis
+
+cortex-up:
+	docker compose up -d cortex-db cortex
+	@echo "Waiting for Cortex to start (this takes ~2 minutes)..."
+	@sleep 120
+
+cortex-status:
+	@curl -sf http://localhost:9001/api/status \
+	  && echo "Cortex reachable at http://localhost:9001" \
+	  || echo "Cortex not reachable"
+
+cortex-init:
+	python3 cortex/setup/init_cortex.py
+
+cortex-analysers:
+	python3 cortex/setup/configure_analysers.py
+
+cortex-connect-thehive:
+	python3 cortex/setup/connect_thehive.py
+
+cortex-verify:
+	python3 cortex/setup/verify_cortex.py
+
+cortex-setup: cortex-up cortex-init cortex-analysers cortex-connect-thehive cortex-verify
+	@echo "Cortex setup complete. Access at http://localhost:9001"
+
+cortex-logs:
+	docker compose logs -f cortex cortex-db
+
+ingest-alerts:
+	python3 cortex/automation/alert_ingestor.py
+
+ingest-alerts-dry:
+	python3 cortex/automation/alert_ingestor.py --dry-run
+
+enrich-alerts:
+	python3 cortex/automation/alert_enricher.py
+
+export-iocs:
+	python3 cortex/automation/misp_exporter.py
+
+kpi-report:
+	python3 cortex/automation/kpi_tracker.py --output both --save
+
+kpi-prometheus:
+	python3 cortex/automation/kpi_tracker.py --output prometheus

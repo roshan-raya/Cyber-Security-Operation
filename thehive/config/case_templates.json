@@ -1,0 +1,73 @@
+[
+  {
+    "name": "BOT_ATTACK",
+    "displayName": "Bot Attack / Game Exploit",
+    "description": "Automated bot attempting to exploit game mechanics or APIs",
+    "severity": 2,
+    "tlp": 2,
+    "pap": 2,
+    "tags": ["bot", "game-integrity", "automated-attack"],
+    "tasks": [
+      {"title": "Triage", "description": "Confirm alert is a true positive; check affected game servers"},
+      {"title": "Contain", "description": "Block offending IPs at firewall; flag player account"},
+      {"title": "Investigate", "description": "Analyse traffic patterns; identify exploit method"},
+      {"title": "Remediate", "description": "Patch exploited endpoint; update bot detection rules"},
+      {"title": "Report", "description": "Document incident; export IOCs to MISP"},
+      {"title": "Close", "description": "Confirm resolution; update playbook if needed"}
+    ]
+  },
+  {
+    "name": "ACCOUNT_COMPROMISE",
+    "displayName": "Account Compromise / Credential Stuffing",
+    "description": "Suspected unauthorised access to player or staff account",
+    "severity": 3,
+    "tlp": 2,
+    "pap": 2,
+    "tags": ["account-takeover", "credential-stuffing", "player-data"],
+    "tasks": [
+      {"title": "Triage", "description": "Confirm login anomaly; check geolocation and device fingerprint"},
+      {"title": "Contain", "description": "Force password reset; revoke active sessions; lock account"},
+      {"title": "Investigate", "description": "Review login history; check for data access or exfiltration"},
+      {"title": "Notify", "description": "Inform player if personal data was accessed (GDPR consideration)"},
+      {"title": "Remediate", "description": "Enable MFA; update detection thresholds"},
+      {"title": "Report", "description": "Document incident; export IOCs to MISP"},
+      {"title": "Close", "description": "Confirm account secured; update playbook"}
+    ]
+  },
+  {
+    "name": "SOCIAL_ENGINEERING",
+    "displayName": "Social Engineering / Phishing",
+    "description": "Social engineering attempt targeting staff or players",
+    "severity": 3,
+    "tlp": 3,
+    "pap": 2,
+    "tags": ["social-engineering", "phishing", "insider-threat"],
+    "tasks": [
+      {"title": "Triage", "description": "Confirm report; identify targeted user and method"},
+      {"title": "Contain", "description": "Isolate affected account; block malicious domain or sender"},
+      {"title": "Investigate", "description": "Trace attack chain; identify what data was targeted"},
+      {"title": "Escalate", "description": "Notify L3 IR Lead if player data was at risk"},
+      {"title": "Remediate", "description": "Security awareness comms to all staff"},
+      {"title": "Report", "description": "Document incident; export IOCs to MISP"},
+      {"title": "Close", "description": "Confirm no further risk; update playbook"}
+    ]
+  },
+  {
+    "name": "DDOS_INFRASTRUCTURE",
+    "displayName": "DDoS / Infrastructure Attack",
+    "description": "Volumetric or application-layer attack against game servers",
+    "severity": 3,
+    "tlp": 2,
+    "pap": 2,
+    "tags": ["ddos", "infrastructure", "availability"],
+    "tasks": [
+      {"title": "Triage", "description": "Confirm attack type and affected services"},
+      {"title": "Contain", "description": "Enable rate limiting; activate DDoS mitigation"},
+      {"title": "Investigate", "description": "Identify attack vectors and source IPs"},
+      {"title": "Escalate", "description": "Notify L3 IR Lead and management if matchmaking is down"},
+      {"title": "Remediate", "description": "Null-route attack traffic; restore services"},
+      {"title": "Report", "description": "Document incident; export IOCs to MISP"},
+      {"title": "Close", "description": "Post-incident review; update runbook"}
+    ]
+  }
+]

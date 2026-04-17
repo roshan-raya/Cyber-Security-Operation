@@ -39,3 +39,19 @@ grafana/data/
 
 # Prometheus (runtime data)
 prometheus/data/
+
+# TheHive secrets
+thehive/setup/api_key.txt
+
+# MISP
+misp/setup/__pycache__/
+.misp_auth_key
+
+# Cortex
+cortex/setup/cortex_api_key.txt
+cortex/automation/ingestor_results.json
+cortex/automation/export_log.json
+cortex/automation/soc_kpi_metrics.prom
+cortex/automation/kpi_report_*.txt
+cortex/setup/__pycache__/
+cortex/automation/__pycache__/
