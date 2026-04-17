@@ -10,12 +10,18 @@ on:
 jobs:
   patch:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Install make and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make jq
 
       - name: Start stack
         run: |
@@ -31,3 +37,7 @@ jobs:
       - name: Show report
         run: make patch-report
         continue-on-error: true
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile sim down -v

@@ -63,8 +63,13 @@ jobs:
       - name: Show report snippet (debug)
         if: always()
         run: |
-          docker compose exec -T ansible sh -lc \
-            "echo '--- latest report ---' && head -n 40 /ansible/reports/patch_report_latest.json || true"
+          # Only exec if ansible is up (avoids misleading errors when ansible-lint fails before Docker starts)
+          if docker compose exec -T ansible true 2>/dev/null; then
+            docker compose exec -T ansible sh -lc \
+              "echo '--- latest report ---' && head -n 40 /ansible/reports/patch_report_latest.json || true"
+          else
+            echo "Skipping report snippet: ansible container is not running (an earlier step failed or the stack was not started)."
+          fi
 
       - name: Tear down
         if: always()
