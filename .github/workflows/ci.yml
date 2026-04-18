@@ -8,7 +8,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Sim profile images are large; --no-cache every run often hits the old 20m limit while patch.yml passes.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -18,9 +19,14 @@ jobs:
         run: |
           pip install ansible-lint
 
+      # ansible.cfg sets roles_path=/ansible/roles (Docker-only). Force runner paths in this shell
+      # so syntax-check finds roles, and pass -c so .ansible-lint is always loaded from the repo root.
       - name: Run ansible-lint
         run: |
-          ansible-lint ansible/
+          set -euxo pipefail
+          test -f "${GITHUB_WORKSPACE}/.ansible-lint" || { echo "FATAL: missing .ansible-lint at repo root"; exit 1; }
+          export ANSIBLE_ROLES_PATH="${GITHUB_WORKSPACE}/ansible/roles"
+          ansible-lint -c "${GITHUB_WORKSPACE}/.ansible-lint" "${GITHUB_WORKSPACE}/ansible"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -32,7 +38,8 @@ jobs:
 
       - name: Build (sim profile)
         run: |
-          docker compose --profile sim build --no-cache
+          # Use layer cache (no --no-cache): full rebuilds every CI run often time out on ubuntu-latest.
+          docker compose --profile sim build
 
       - name: Start stack
         run: |

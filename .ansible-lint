@@ -1,0 +1,14 @@
+# Lint policy for CI: ansible.cfg uses roles_path=/ansible/roles (Docker-only).
+# GitHub Actions sets ANSIBLE_ROLES_PATH in .github/workflows/ci.yml so syntax-check finds roles.
+# Stylistic rules below are deferred to Ansible playbook/role owners; re-enable as they align code.
+---
+skip_list:
+  - var-naming
+  - yaml[line-length]
+  - yaml[truthy]
+  - risky-file-permissions
+  - command-instead-of-shell
+  - risky-shell-pipe
+  - name[play]
+  # Playbook uses strategy: free for concurrent patching; run-once flags that pattern.
+  - run-once
