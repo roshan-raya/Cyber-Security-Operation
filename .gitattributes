@@ -1,0 +1,2 @@
+# Linux containers: CRLF in shell entrypoints causes exit 127 in Docker.
+*.sh text eol=lf
