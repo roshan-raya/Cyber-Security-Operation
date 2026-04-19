@@ -138,6 +138,46 @@ MOCK_ALERTS = [
 ]
 
 
+def count_observables_in_feed():
+    return sum(len(a["observables"]) for a in MOCK_ALERTS)
+
+
+def baseline_block():
+    return {
+        "alerts_in_feed": len(MOCK_ALERTS),
+        "observables_in_feed": count_observables_in_feed(),
+    }
+
+
+def build_dry_run_manifest(indices):
+    """indices: list of indices into MOCK_ALERTS."""
+    results = []
+    obs_total = 0
+    for idx in indices:
+        alert = MOCK_ALERTS[idx]
+        template = TYPE_TO_TEMPLATE[alert["type"]]
+        nobs = len(alert["observables"])
+        obs_total += nobs
+        results.append(
+            {
+                "alert_index": idx + 1,
+                "title": alert["title"],
+                "status": "defined",
+                "case_template": template,
+                "observables_count": nobs,
+            }
+        )
+    return {
+        "mode": "dry_run",
+        "note": "Mock feed definition only; no TheHive API calls. Run make ingest-alerts to create cases.",
+        "baseline": baseline_block(),
+        "alerts_in_this_run": len(indices),
+        "observables_in_this_run": obs_total,
+        "seconds": 0.0,
+        "results": results,
+    }
+
+
 def read_api_key():
     with open(API_KEY_FILE, encoding="utf-8") as fh:
         return fh.read().strip()
@@ -154,6 +194,36 @@ def headers(api_key):
 def hive_datatype(obs_type):
     mapping = {"mail": "mail", "hash": "hash"}
     return mapping.get(obs_type, obs_type)
+
+
+def find_alert_by_feed_key(session, api_key, alert):
+    """Return alert row matching source + sourceRef + type (feed identity)."""
+    body = {
+        "query": [
+            {"_name": "listAlert"},
+            {"_name": "filter", "_field": "sourceRef", "_value": alert["sourceRef"]},
+        ]
+    }
+    r = session.post(
+        f"{THEHIVE_URL}/api/v1/query",
+        headers=headers(api_key),
+        json=body,
+        timeout=120,
+    )
+    if r.status_code != 200:
+        return None
+    try:
+        rows = r.json()
+    except ValueError:
+        return None
+    if not isinstance(rows, list):
+        return None
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("source") == alert["source"] and row.get("type") == alert["type"]:
+            return row
+    return None
 
 
 def create_alert(session, api_key, alert):
@@ -247,13 +317,25 @@ def main():
     args = parser.parse_args()
 
     if args.dry_run:
-        indices = [args.single - 1] if args.single else range(len(MOCK_ALERTS))
+        indices = [args.single - 1] if args.single else list(range(len(MOCK_ALERTS)))
         for i in indices:
             a = MOCK_ALERTS[i]
             tpl = TYPE_TO_TEMPLATE[a["type"]]
             print(f"[DRY-RUN] Would create alert + case: {a['title']} -> {tpl}")
             for o in a["observables"]:
                 print(f"            observable {o['type']}:{o['value']}")
+        manifest = build_dry_run_manifest(indices)
+        with open(RESULTS_PATH, "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh, indent=2)
+        b = manifest["baseline"]
+        print()
+        print("=== Summary (dry-run, no API calls) ===")
+        print(f"Baseline: {b['alerts_in_feed']} alerts, {b['observables_in_feed']} observables in MOCK_ALERTS")
+        print(
+            f"This run: {manifest['alerts_in_this_run']} alerts, "
+            f"{manifest['observables_in_this_run']} observables"
+        )
+        print(f"Wrote {RESULTS_PATH}")
         return
 
     try:
@@ -278,6 +360,47 @@ def main():
 
         ar = create_alert(session, api_key, alert)
         if ar.status_code not in (200, 201):
+            dup = (
+                ar.status_code == 400
+                and "already exists" in (ar.text or "").lower()
+            )
+            if dup:
+                hit = find_alert_by_feed_key(session, api_key, alert)
+                if hit:
+                    alert_id = hit.get("_id") or hit.get("id")
+                    case_id = hit.get("caseId")
+                    if not case_id and alert_id:
+                        pr, _ = promote_alert(session, api_key, alert_id, template)
+                        if pr.status_code in (200, 201):
+                            case_id = extract_case_id(pr)
+                    if case_id and alert_id:
+                        obs_added = 0
+                        for obs in alert["observables"]:
+                            good, _ = add_observable(session, api_key, case_id, obs)
+                            if good:
+                                obs_added += 1
+                            else:
+                                print(
+                                    f"[WARN] Observable add failed {obs['type']}:{obs['value']}"
+                                )
+                        total_obs += obs_added
+                        ok_cases += 1
+                        entry.update(
+                            {
+                                "status": "ok",
+                                "caseId": case_id,
+                                "alertId": alert_id,
+                                "observables": obs_added,
+                                "note": "feed_alert_already_present",
+                            }
+                        )
+                        results.append(entry)
+                        print(
+                            f"[OK] Feed alert already in org — using case #{case_id}: {alert['title']}"
+                        )
+                        if INGEST_INTERVAL > 0 and pos < len(idx_list) - 1:
+                            time.sleep(min(INGEST_INTERVAL, 5))
+                        continue
             print(f"[FAIL] Alert create for {alert['title']}: HTTP {ar.status_code} {ar.text[:300]}")
             failed += 1
             results.append(entry)
@@ -324,6 +447,8 @@ def main():
 
     elapsed = time.time() - t0
     summary = {
+        "mode": "live",
+        "baseline": baseline_block(),
         "total_alerts": len(idx_list),
         "cases_created": ok_cases,
         "failed": failed,

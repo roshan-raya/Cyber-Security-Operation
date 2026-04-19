@@ -285,8 +285,18 @@ services:
       - thehive
       - --cql-keyspace
       - thehive
+      # TheHive 5.2 has no /api/v1/connector REST; Cortex is wired at startup (see StrangeBee docs).
+      - --cortex-hostnames
+      - cortex
+      - --cortex-keys
+      - ${CORTEX_API_KEY:-}
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:9000/api/v1/status"]
+      # /api/v1/status returns 401 without auth; treat 200|401 as up (same as make thehive-status).
+      test:
+        [
+          "CMD-SHELL",
+          'code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/api/v1/status); [ "$$code" = "200" ] || [ "$$code" = "401" ]',
+        ]
       interval: 30s
       timeout: 10s
       retries: 10

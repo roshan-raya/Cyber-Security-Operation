@@ -6,6 +6,20 @@
 - SLA: 15 minutes to triage, 30 minutes to mitigate
 - TheHive Template: DDOS_INFRASTRUCTURE
 
+## MITRE ATT&CK Mapping
+| Tactic | Technique | ID |
+|--------|-----------|-----|
+| Impact | Network Denial of Service | T1498 |
+| Impact | Endpoint Denial of Service | T1499 |
+| Reconnaissance | Active Scanning | T1595 |
+| Resource Development | Botnet | T1583.005 |
+
+## Escalation Integration
+- L1 handles: Initial detection, rate limiting
+- Escalate to L2 immediately: Matchmaking service impacted
+- Escalate to L3 if: Extended outage, pre-launch timing suspicious
+- TheHive: Set matchmaking-service custom field
+
 ## Trigger
 - Prometheus alert: server CPU/bandwidth threshold exceeded
 - Game server: matchmaking latency spike

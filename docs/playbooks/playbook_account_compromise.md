@@ -6,6 +6,20 @@
 - SLA: 15 minutes to triage, 1 hour to contain
 - TheHive Template: ACCOUNT_COMPROMISE
 
+## MITRE ATT&CK Mapping
+| Tactic | Technique | ID |
+|--------|-----------|-----|
+| Credential Access | Brute Force | T1110 |
+| Credential Access | Credential Stuffing | T1110.004 |
+| Initial Access | Valid Accounts | T1078 |
+| Collection | Data from Local System | T1005 |
+
+## Escalation Integration
+- L1 handles: Single account compromise, password reset
+- Escalate to L2 if: >5 accounts, payment data accessed
+- Escalate to L3 if: Bulk exfiltration, GDPR notification required
+- TheHive: Add player-id custom field, set severity=High
+
 ## Trigger
 - Failed login spike from single IP across multiple accounts
 - Successful login from unusual geolocation

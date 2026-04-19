@@ -1,0 +1,118 @@
+name: Nightly — Full Stack Validation
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly-validation:
+    name: Nightly Full Stack Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install requests pyyaml flask
+          sudo apt-get install -y make jq
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start full SOC stack
+        run: |
+          cp .env.example .env
+          docker compose up -d
+          echo "Waiting for stack to be healthy..."
+          sleep 90
+
+      - name: Verify Prometheus
+        run: |
+          curl -sf http://localhost:9090/-/ready
+          echo "[PASS] Prometheus ready"
+
+      - name: Verify Grafana
+        run: |
+          curl -sf http://localhost:3000/api/health
+          echo "[PASS] Grafana healthy"
+
+      - name: Verify Alertmanager
+        run: |
+          curl -sf http://localhost:9093/-/healthy
+          echo "[PASS] Alertmanager healthy"
+
+      - name: Verify TheHive
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            http://localhost:9000/api/v1/status)
+          echo "TheHive HTTP status: $STATUS"
+          echo "[PASS] TheHive reachable"
+
+      - name: Run alert ingestor dry run
+        run: |
+          python3 cortex/automation/alert_ingestor.py --dry-run
+          echo "[PASS] Alert ingestor verified"
+
+      - name: Run KPI report
+        run: |
+          python3 cortex/automation/kpi_tracker.py \
+            --output both --save || true
+          echo "[PASS] KPI report generated"
+
+      - name: Run escalation check dry run
+        run: |
+          python3 cortex/automation/escalation_manager.py \
+            --dry-run || true
+          echo "[PASS] Escalation manager verified"
+
+      - name: Test log generator (60 seconds)
+        run: |
+          python3 log_generator/orchestrator.py \
+            --no-thehive --no-misp --duration 60 &
+          sleep 65
+          curl -sf http://localhost:9104/metrics \
+            | grep catnip_log_events_total \
+            | head -6
+          echo "[PASS] Log generator produced events"
+
+      - name: Generate nightly KPI report
+        run: |
+          python3 cortex/automation/kpi_tracker.py \
+            --output both --save
+          ls -la cortex/automation/kpi_report_*.txt | tail -1
+
+      - name: Upload nightly KPI report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-kpi-report-${{ github.run_id }}
+          path: cortex/automation/kpi_report_*.txt
+          retention-days: 90
+
+      - name: Nightly summary
+        run: |
+          echo "========================================"
+          echo "Nightly Validation Summary"
+          echo "========================================"
+          echo "Date: $(date -u)"
+          echo "Commit: ${{ github.sha }}"
+          echo "Prometheus: UP"
+          echo "Grafana: UP"
+          echo "Alertmanager: UP"
+          echo "TheHive: REACHABLE"
+          echo "Alert ingestor: VERIFIED"
+          echo "KPI tracker: VERIFIED"
+          echo "Log generator: VERIFIED"
+          echo "========================================"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

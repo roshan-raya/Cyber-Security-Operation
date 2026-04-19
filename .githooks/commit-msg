@@ -1,0 +1,9 @@
+#!/bin/sh
+# Strip Cursor attribution trailer from the final commit message (runs after the editor / Agent).
+msg=${1:?}
+[ -f "$msg" ] || exit 0
+tmp="${msg}.strip.$$"
+sed -E \
+	-e '/^[Mm]ade-[Ww]ith:/d' \
+	-e '/^[Mm]ade with [Cc]ursor[[:space:]]*$/d' \
+	"$msg" >"$tmp" && mv "$tmp" "$msg"

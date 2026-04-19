@@ -44,3 +44,19 @@ scrape_configs:
           - alertmanager:9093
         labels:
           role: alertmanager
+
+  - job_name: soc_kpi
+    scrape_interval: 60s
+    static_configs:
+      - targets:
+          - host.docker.internal:9102
+        labels:
+          role: soc-kpi
+
+  - job_name: log_generator
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - host.docker.internal:9104
+        labels:
+          role: log-generator

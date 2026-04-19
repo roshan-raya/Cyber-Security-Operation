@@ -88,11 +88,11 @@ def enable_analyzer(headers, analyzer_id, configuration):
 
 
 def main():
-    headers = {
-        "Authorization": f"Bearer {read_api_key()}",
-        "Content-Type": "application/json",
-    }
-    analyzers = list_analysers(headers)
+    api_key = read_api_key()
+    auth_headers = {"Authorization": f"Bearer {api_key}"}
+    # Do not send Content-Type on GET /api/analyzer — Cortex parses JSON body and fails on empty input.
+    post_headers = {**auth_headers, "Content-Type": "application/json"}
+    analyzers = list_analysers(auth_headers)
     enabled = not_found = errors = already = 0
 
     for spec in ANALYSERS:
@@ -102,7 +102,7 @@ def main():
             print(f"[NOT FOUND] {name}")
             not_found += 1
             continue
-        resp = enable_analyzer(headers, aid, spec["configuration"])
+        resp = enable_analyzer(post_headers, aid, spec["configuration"])
         if resp.status_code in (200, 201, 204):
             print(f"[ENABLED] {name}")
             enabled += 1

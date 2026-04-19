@@ -4,6 +4,7 @@ Python's http.cookiejar will not send them on http:// unless we clear the flag
 before each request (curl does send them).
 """
 import re
+import sys
 
 import requests
 
@@ -73,6 +74,14 @@ def browser_form_login(session, base_url, email, password, login_path="/users/lo
         session.get(response.headers["location"], timeout=30, allow_redirects=True)
         relax_secure_cookies_if_http(session, base)
     elif response.status_code not in (200,):
+        if response.status_code == 403 and "maximum number of login attempts" in (
+            response.text or ""
+        ):
+            print(
+                "MISP: login temporarily blocked (brute-force limit). "
+                "Wait ~5 minutes before retrying; repeated exporter runs count as attempts.",
+                file=sys.stderr,
+            )
         return False
 
     relax_secure_cookies_if_http(session, base)

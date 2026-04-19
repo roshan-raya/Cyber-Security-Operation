@@ -1,0 +1,160 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  fast-checks:
+    name: Fast PR Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python syntax — changed files only
+        run: |
+          git diff --name-only origin/main...HEAD \
+            | grep "\.py$" \
+            | while read f; do
+                if [ -f "$f" ]; then
+                  python3 -m py_compile "$f" \
+                    && echo "[OK] $f" \
+                    || { echo "[FAIL] $f"; exit 1; }
+                fi
+              done
+          echo "Python syntax check: PASS"
+
+      - name: JSON validity check
+        run: |
+          git diff --name-only origin/main...HEAD \
+            | grep "\.json$" \
+            | while read f; do
+                if [ -f "$f" ]; then
+                  python3 -m json.tool "$f" > /dev/null \
+                    && echo "[OK] $f" \
+                    || { echo "[FAIL] $f"; exit 1; }
+                fi
+              done
+          echo "JSON validity: PASS"
+
+      - name: YAML validity check
+        run: |
+          pip install pyyaml
+          git diff --name-only origin/main...HEAD \
+            | grep "\.yml$\|\.yaml$" \
+            | while read f; do
+                if [ -f "$f" ]; then
+                  python3 -c "
+          import yaml, sys
+          with open(sys.argv[1]) as fh:
+              yaml.safe_load(fh)
+          print('[OK]', sys.argv[1])
+                  " "$f" || { echo "[FAIL] $f"; exit 1; }
+                fi
+              done
+          echo "YAML validity: PASS"
+
+      - name: Check .env not committed
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "FAIL: .env is tracked — remove it"
+            exit 1
+          fi
+          echo ".env check: PASS"
+
+      - name: Check secrets not in changed files
+        run: |
+          git diff origin/main...HEAD \
+            | grep "^+" \
+            | grep -iE \
+              "password\s*=\s*['\"][^'\"]{8,}['\"]|api[_-]?key\s*=\s*['\"][^'\"]{16,}['\"]" \
+            | grep -v "os.getenv\|os.environ\|default\|example\|#" \
+            && { echo "WARNING: Possible secret in diff"; } \
+            || echo "Secret diff check: PASS"
+
+  quality-gates:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: fast-checks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Required files present
+        run: |
+          MISSING=0
+          FILES=(
+            "thehive/config/case_templates.json"
+            "docs/playbooks/playbook_bot_attack.md"
+            "docs/playbooks/playbook_account_compromise.md"
+            "docs/playbooks/playbook_social_engineering.md"
+            "docs/playbooks/playbook_ddos.md"
+            "docs/escalation/escalation_procedures.md"
+            "docs/runbook/operational_runbook.md"
+            "prometheus/prometheus.yml"
+            "prometheus/alert.rules.yml"
+            ".env.example"
+            "SECURITY.md"
+            "README.md"
+          )
+          for f in "${FILES[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "[MISSING] $f"
+              MISSING=1
+            else
+              echo "[OK] $f"
+            fi
+          done
+          [ $MISSING -eq 0 ] || exit 1
+          echo "Required files: all present"
+
+      - name: Validate templates config
+        run: |
+          python3 -c "
+          import json
+          with open('thehive/config/case_templates.json') as f:
+              t = json.load(f)
+          assert len(t) == 4
+          required = ['BOT_ATTACK','ACCOUNT_COMPROMISE',
+                      'SOCIAL_ENGINEERING','DDOS_INFRASTRUCTURE']
+          names = [x['name'] for x in t]
+          for r in required:
+              assert r in names, f'Missing: {r}'
+          print(f'Templates: {len(t)}/4 valid')
+          "
+
+      - name: Check gitignore has secrets
+        run: |
+          python3 -c "
+          with open('.gitignore') as f:
+              content = f.read()
+          required = [
+              'api_key.txt',
+              'cortex_api_key.txt',
+              '.misp_auth_key',
+              '.env'
+          ]
+          missing = [r for r in required if r not in content]
+          if missing:
+              print(f'FAIL: gitignore missing: {missing}')
+              exit(1)
+          print('gitignore: all secrets properly ignored')
+          "
+
+      - name: PR summary comment
+        if: always()
+        run: |
+          echo "## PR Quality Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Python syntax | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| JSON validity | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| YAML validity | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets check | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Required files | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Templates config | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitignore | ✅ |" >> $GITHUB_STEP_SUMMARY

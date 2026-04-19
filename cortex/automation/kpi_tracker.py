@@ -16,6 +16,16 @@ API_KEY_FILE = os.path.normpath(
 )
 PROM_FILE = os.path.join(os.path.dirname(__file__), "soc_kpi_metrics.prom")
 
+# TheHive 5 uses workflow statuses such as "New" / "InProgress" for active cases;
+# resolved cases use TruePositive / FalsePositive (not the string "Open" alone).
+CLOSED_CASE_STATUSES = frozenset(
+    {"TruePositive", "FalsePositive", "Duplicated", "Dismissed"}
+)
+
+
+def case_is_active(status):
+    return (status or "") not in CLOSED_CASE_STATUSES
+
 
 def read_strip(path):
     with open(path, encoding="utf-8") as fh:
@@ -32,6 +42,22 @@ def headers(api_key):
 
 def list_all_cases(session, api_key):
     body = {"query": [{"_name": "listCase"}]}
+    r = session.post(
+        f"{THEHIVE_URL}/api/v1/query",
+        headers=headers(api_key),
+        json=body,
+        timeout=120,
+    )
+    if r.status_code != 200:
+        return None, r
+    try:
+        return r.json(), r
+    except ValueError:
+        return None, r
+
+
+def list_all_alerts(session, api_key):
+    body = {"query": [{"_name": "listAlert"}]}
     r = session.post(
         f"{THEHIVE_URL}/api/v1/query",
         headers=headers(api_key),
@@ -115,7 +141,16 @@ def main():
         print(f"Query failed: HTTP {cr.status_code} {cr.text[:400]}")
         sys.exit(1)
 
+    alerts_data, ar = list_all_alerts(session, api_key)
+    if alerts_data is None:
+        print(f"Alert query failed: HTTP {ar.status_code} {ar.text[:400]}")
+        sys.exit(1)
+
     cases = [c for c in cases_data if isinstance(c, dict)]
+    alerts = [a for a in alerts_data if isinstance(a, dict) and a.get("_type") == "Alert"]
+    alerts_total = len(alerts)
+    alerts_with_case = sum(1 for a in alerts if a.get("caseId"))
+    alerts_no_case = alerts_total - alerts_with_case
     now_ms = int(time.time() * 1000)
     day_ago_ms = now_ms - 24 * 60 * 60 * 1000
 
@@ -130,8 +165,9 @@ def main():
 
     for case in cases:
         status = case.get("status") or ""
-        if status == "Open":
+        if case_is_active(status):
             open_count += 1
+            sev_counter[severity_label(case.get("severity"))] += 1
         if status in ("TruePositive", "FalsePositive"):
             resolved_count += 1
             start = to_ms(case.get("startDate") or case.get("_createdAt") or case.get("createdAt"))
@@ -139,8 +175,6 @@ def main():
             if start is not None:
                 end_use = end if end is not None else now_ms
                 mttr_samples.append(max(0, (end_use - start) / 60000.0))
-
-        sev_counter[severity_label(case.get("severity"))] += 1
 
         start = to_ms(case.get("startDate") or case.get("_createdAt") or case.get("createdAt"))
         if start is not None and start >= day_ago_ms:
@@ -199,7 +233,12 @@ def main():
     human.append(f"├─ Resolved cases:    {resolved_count}")
     human.append(f"└─ Created today:     {cases_today}")
     human.append("")
-    human.append("SEVERITY BREAKDOWN")
+    human.append("ALERT PIPELINE (TheHive alerts ≠ cases until promoted)")
+    human.append(f"├─ Imported alerts:   {alerts_total}")
+    human.append(f"├─ Linked to a case:  {alerts_with_case}")
+    human.append(f"└─ Pending case link: {alerts_no_case}")
+    human.append("")
+    human.append("OPEN CASES BY SEVERITY")
     human.append(f"├─ Critical:  {sev_counter['critical']}")
     human.append(f"├─ High:      {sev_counter['high']}")
     human.append(f"├─ Medium:    {sev_counter['medium']}")
@@ -237,7 +276,19 @@ def main():
         "# TYPE soc_cases_today gauge",
         f"soc_cases_today {cases_today}",
         "",
-        "# HELP soc_cases_by_severity Cases by severity level",
+        "# HELP soc_alerts_total Alerts visible in TheHive (imported + triage pipeline)",
+        "# TYPE soc_alerts_total gauge",
+        f"soc_alerts_total {alerts_total}",
+        "",
+        "# HELP soc_alerts_with_case Alerts already linked to a case",
+        "# TYPE soc_alerts_with_case gauge",
+        f"soc_alerts_with_case {alerts_with_case}",
+        "",
+        "# HELP soc_alerts_without_case Alerts not yet linked to a case (e.g. not promoted)",
+        "# TYPE soc_alerts_without_case gauge",
+        f"soc_alerts_without_case {alerts_no_case}",
+        "",
+        "# HELP soc_cases_by_severity Open SOC cases by severity level",
         "# TYPE soc_cases_by_severity gauge",
         f'soc_cases_by_severity{{severity="critical"}} {sev_counter["critical"]}',
         f'soc_cases_by_severity{{severity="high"}} {sev_counter["high"]}',

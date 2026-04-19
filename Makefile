@@ -1,4 +1,4 @@
-.PHONY: up down logs status clean validate validate-reports lint-prometheus patch patch-dryrun patch-health patch-report metrics-test patch-staging patch-production patch-blue patch-green patch-canary patch-immutable patch-drift thehive-up thehive-init thehive-init-force thehive-rekey thehive-canonicalize-templates thehive-templates thehive-setup thehive-status thehive-logs misp-up misp-status misp-init misp-feeds misp-verify misp-reset-login-lockout misp-integration-test misp-setup misp-logs cortex-up cortex-status cortex-init cortex-analysers cortex-connect-thehive cortex-verify cortex-setup cortex-logs ingest-alerts ingest-alerts-dry enrich-alerts export-iocs kpi-report kpi-prometheus
+.PHONY: up down logs status clean validate validate-reports health-check lint-prometheus patch patch-dryrun patch-health patch-report metrics-test patch-staging patch-production patch-blue patch-green patch-canary patch-immutable patch-drift thehive-up thehive-init thehive-init-force thehive-rekey thehive-canonicalize-templates thehive-templates thehive-setup thehive-status thehive-logs misp-up misp-status misp-init misp-feeds misp-verify misp-reset-login-lockout misp-integration-test misp-setup misp-logs cortex-up cortex-status cortex-init cortex-analysers cortex-connect-thehive cortex-verify cortex-setup cortex-logs ingest-alerts ingest-alerts-dry enrich-alerts export-iocs kpi-report kpi-prometheus kpi-server kpi-server-stop check-escalations check-escalations-dry start-logs start-logs-fast start-logs-no-integrations stop-logs logs-status logs-summary view-logs view-ids-logs view-firewall-logs watch-metrics watch-metrics-catnip git-hooks
 
 up:
 	docker compose up -d
@@ -54,6 +54,9 @@ validate:
 	echo "  - Open http://localhost:3000 and login with .env credentials"; \
 	echo "  - Open Node Overview dashboard and confirm metrics after scrape interval"; \
 	if [ "$$FAIL" -eq 1 ]; then exit 1; fi
+
+# Alias for stack / endpoint health (same as validate)
+health-check: validate
 
 # Validate reports, compliance >= 95%, SLA duration <= 2h, no failed hosts (run after make patch)
 validate-reports:
@@ -212,10 +215,23 @@ cortex-analysers:
 	python3 cortex/setup/configure_analysers.py
 
 cortex-connect-thehive:
-	python3 cortex/setup/connect_thehive.py
+	@KEY=$$(cat cortex/setup/cortex_api_key.txt 2>/dev/null | tr -d '\r\n'); \
+	if [ -z "$$KEY" ]; then echo "Missing cortex/setup/cortex_api_key.txt (run make cortex-init)"; exit 1; fi; \
+	export CORTEX_API_KEY=$$KEY; \
+	docker compose up -d --force-recreate thehive && \
+	THEHIVE_URL=$${THEHIVE_URL:-http://localhost:9000} CORTEX_URL=$${CORTEX_URL:-http://localhost:9001} python3 cortex/setup/connect_thehive.py
 
 cortex-verify:
-	python3 cortex/setup/verify_cortex.py
+	@THIVE_CODE=$$(curl -s -o /dev/null -w "%{http_code}" -m 5 $${THEHIVE_URL:-http://localhost:9000}/api/v1/status 2>/dev/null || echo 000); \
+	if [ "$$THIVE_CODE" = "200" ] || [ "$$THIVE_CODE" = "401" ]; then \
+	  THEHIVE_URL=$${THEHIVE_URL:-http://localhost:9000} CORTEX_URL=$${CORTEX_URL:-http://localhost:9001} python3 cortex/setup/verify_cortex.py; \
+	else \
+	  net=$$(docker inspect -f '{{range $$k, $$v := .NetworkSettings.Networks}}{{$$k}}{{end}}' thehive 2>/dev/null); \
+	  if [ -z "$$net" ]; then echo "TheHive not reachable (HTTP $$THIVE_CODE) and thehive container not found."; exit 1; fi; \
+	  docker run --rm --network "$$net" -v "$$PWD:/work" -w /work \
+	    -e CORTEX_URL=http://cortex:9001 -e THEHIVE_URL=http://thehive:9000 \
+	    python:3.12-slim bash -c "pip install -q requests && python3 cortex/setup/verify_cortex.py"; \
+	fi
 
 cortex-setup: cortex-up cortex-init cortex-analysers cortex-connect-thehive cortex-verify
 	@echo "Cortex setup complete. Access at http://localhost:9001"
@@ -240,3 +256,74 @@ kpi-report:
 
 kpi-prometheus:
 	python3 cortex/automation/kpi_tracker.py --output prometheus
+
+kpi-server:
+	python3 cortex/automation/kpi_metrics_server.py &
+	@echo "KPI metrics server started on port 9102"
+
+kpi-server-stop:
+	@pkill -f kpi_metrics_server.py || echo "Server not running"
+
+check-escalations:
+	python3 cortex/automation/escalation_manager.py
+
+check-escalations-dry:
+	python3 cortex/automation/escalation_manager.py --dry-run
+
+start-logs:
+	python3 log_generator/orchestrator.py &
+	@echo "Log generator started. Metrics on port 9104"
+
+start-logs-fast:
+	python3 log_generator/orchestrator.py --rate fast &
+	@echo "Log generator started (fast mode)"
+
+start-logs-no-integrations:
+	python3 log_generator/orchestrator.py --no-thehive --no-misp &
+	@echo "Log generator started (no integrations)"
+
+stop-logs:
+	@pkill -f "log_generator/orchestrator.py" || echo "Not running"
+	@pkill -f "log_generator/generator.py" || echo "Not running"
+
+logs-status:
+	@curl -s http://localhost:9104/health || echo "Log generator not running"
+
+logs-summary:
+	@cat log_generator/state/metrics.json 2>/dev/null \
+	  | python3 -m json.tool || echo "No metrics yet. Run: make start-logs"
+
+view-logs:
+	@tail -f log_generator/logs/combined.log
+
+view-ids-logs:
+	@tail -f log_generator/logs/ids_alert.log
+
+view-firewall-logs:
+	@tail -f log_generator/logs/firewall_block.log
+
+# macOS has no `watch` by default; use this instead of: watch -n 5 'curl ... | grep ...'
+watch-metrics:
+	@while true; do \
+		clear; \
+		echo "=== $$(date '+%Y-%m-%d %H:%M:%S') — log_generator /metrics (Ctrl+C) ==="; \
+		curl -s http://localhost:9104/metrics \
+			| grep -E 'catnip_log_events_total|catnip_thehive_cases|catnip_misp_iocs' \
+			|| echo "(no matching lines — is make start-logs running?)"; \
+		sleep 5; \
+	done
+
+watch-metrics-catnip:
+	@while true; do \
+		clear; \
+		echo "=== $$(date '+%Y-%m-%d %H:%M:%S') — all catnip_* (Ctrl+C) ==="; \
+		curl -s http://localhost:9104/metrics | grep catnip \
+			|| echo "(no catnip_* lines — is make start-logs running?)"; \
+		sleep 5; \
+	done
+
+# One-time per clone: use repo hooks (strips Made-with: Cursor from commit messages).
+git-hooks:
+	git config core.hooksPath .githooks
+	@chmod +x .githooks/commit-msg 2>/dev/null || true
+	@echo "core.hooksPath=.githooks (commit-msg strips Cursor attribution)"

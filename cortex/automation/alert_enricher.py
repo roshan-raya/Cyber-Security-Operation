@@ -17,6 +17,16 @@ CORTEX_KEY_FILE = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "setup", "cortex_api_key.txt")
 )
 
+# Match kpi_tracker / escalation_manager: TH5 active cases use New, InProgress, etc.
+CLOSED_CASE_STATUSES = frozenset(
+    {"TruePositive", "FalsePositive", "Duplicated", "Dismissed"}
+)
+
+
+def case_is_active_status(status):
+    return (status or "") not in CLOSED_CASE_STATUSES
+
+
 OBS_TO_ANALYSERS = {
     "ip": ["AbuseIPDB", "MaxMind_GeoIP", "Shodan_Host"],
     "domain": ["VirusTotal_GetReport"],
@@ -48,19 +58,18 @@ def run_query(session, api_key, body):
 
 
 def list_open_cases(session, api_key):
-    body = {
-        "query": [
-            {"_name": "listCase"},
-            {"_name": "filter", "_field": "status", "_value": "Open"},
-        ]
-    }
+    body = {"query": [{"_name": "listCase"}]}
     r = run_query(session, api_key, body)
     if r.status_code != 200:
         return None, r
     try:
-        return r.json(), r
+        raw = r.json()
     except ValueError:
         return None, r
+    if not isinstance(raw, list):
+        return None, r
+    filtered = [c for c in raw if isinstance(c, dict) and case_is_active_status(c.get("status"))]
+    return filtered, r
 
 
 def get_observables(session, api_key, case_id):

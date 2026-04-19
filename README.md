@@ -1,5 +1,33 @@
 # Enterprise Automated Patch Management Platform
 
+![CI](https://github.com/roshan-raya/Cyber-Security-Operation/actions/workflows/ci.yml/badge.svg)
+![Nightly](https://github.com/roshan-raya/Cyber-Security-Operation/actions/workflows/nightly.yml/badge.svg)
+![Security](https://github.com/roshan-raya/Cyber-Security-Operation/actions/workflows/security.yml/badge.svg)
+
+## CI/CD Pipeline
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| CI | Every push + PR | Code quality, syntax, integration tests |
+| Nightly | 2am daily | Full stack validation, KPI report |
+| Security | Weekly + PR | SAST, secret scan, container scan |
+| PR Checks | Every PR | Fast quality gates, required files |
+| Release | On git tag | Validate, package, publish release |
+
+### Running locally
+
+All CI checks can be run locally before pushing:
+
+```bash
+make validate
+make thehive-templates
+make misp-verify
+make cortex-verify
+python3 cortex/automation/alert_ingestor.py --dry-run
+python3 cortex/automation/kpi_tracker.py --output human
+python3 cortex/automation/escalation_manager.py --dry-run
+```
+
 Production-ready Dockerised patch orchestration with Ansible, Prometheus, Grafana, and automated rollback. One file: architecture + setup on any laptop.
 
 ---
@@ -56,6 +84,10 @@ make thehive-status      # Check TheHive is running
 Open http://localhost:9000
 
 > Note: TheHive Community Edition does not expose **create** case templates via REST API (`manageCaseTemplate` on POST). Create templates in the UI first, then run **`make thehive-canonicalize-templates`** so their **Name** fields match the canonical ids (`BOT_ATTACK`, …). **`make thehive-templates`** then checks those names **and** the task lists defined in `thehive/config/case_templates.json`.
+
+**Template name drift:** If a template was saved with a typo in the machine name (for example **`DDOS_INFRASTUTURE`** instead of **`DDOS_INFRASTRUCTURE`**—wrong spelling of *Infrastructure*), ingestion and checks expect the canonical id **`DDOS_INFRASTRUCTURE`**. After TheHive is running, run **`make thehive-canonicalize-templates`** once to PATCH names to match `thehive/config/case_templates.json`, then **`make thehive-templates`** to confirm.
+
+**API key after restart:** The SOC automation scripts read **`thehive/setup/api_key.txt`**. If Cassandra or TheHive data was reset, or TheHive was recreated so the previous organisation API key no longer works, run **`make thehive-init`** again (or **`make thehive-rekey`** to renew only the key) before **`make ingest-alerts`**, **`make kpi-report`**, or **`make check-escalations`**. Otherwise automation may see empty results or HTTP 401.
 
 ### Default passwords (development)
 
@@ -119,6 +151,8 @@ After `cp .env.example .env`, Grafana, TheHive org admin, MISP admin, and the se
 | Login fails | Run: `make thehive-init` to re-initialise users |
 | Templates missing or wrong name | Create rough templates in UI, then `make thehive-canonicalize-templates`, then `make thehive-templates` |
 | API key invalid / Cassandra rebuilt | Run: `make thehive-rekey` (or `make thehive-init-force` for a full pass) |
+| After **TheHive container restart** automation fails with 401 or empty cases | Run **`make thehive-init`** (or **`make thehive-rekey`**) so **`thehive/setup/api_key.txt`** matches a valid org API key |
+| KPI / `soc_open_cases` show **0** but cases exist in the UI | TheHive 5 marks active cases as **`New`** (not only **`Open`**). Use a current **`kpi_tracker.py`**; refresh metrics with **`make kpi-report`** |
 | Cassandra not ready | Wait 60-90s after startup; check: `docker compose logs cassandra` |
 
 ---
@@ -203,6 +237,8 @@ make kpi-report            # Generate SOC KPI report
 | Shodan | IP infrastructure intel | `SHODAN_API_KEY` |
 | MISP_2_1 | Local MISP lookup | `MISP_THEHIVE_API_KEY` |
 
+**Cortex Community Edition:** Many analysers appear as **`[NOT FOUND]`** in the UI or in **`make cortex-analysers`** output because CE ships a reduced catalog and images may not bundle every resolver. That is expected in this project. A **production** deployment typically uses Cortex Enterprise or full analyser images and valid vendor API keys (see placeholders in **`.env.example`**).
+
 ### Automation scripts
 
 | Script | Command | Purpose |
@@ -212,16 +248,114 @@ make kpi-report            # Generate SOC KPI report
 | `misp_exporter.py` | `make export-iocs` | Exports resolved case IOCs to MISP |
 | `kpi_tracker.py` | `make kpi-report` | SOC KPI report + Prometheus textfile metrics |
 
-Free API keys for AbuseIPDB, VirusTotal, and Shodan are available at [abuseipdb.com](https://www.abuseipdb.com), [virustotal.com](https://www.virustotal.com), and [shodan.io](https://www.shodan.io). Add them to `.env` for full analyser behaviour; the setup scripts use `demo_key` when a variable is unset (limited or placeholder behaviour).
+Free API keys for AbuseIPDB, VirusTotal, and Shodan are available at [abuseipdb.com](https://www.abuseipdb.com), [virustotal.com](https://www.virustotal.com), and [shodan.io](https://www.shodan.io). Copy **`ABUSEIPDB_API_KEY`**, **`VT_API_KEY`**, and **`SHODAN_API_KEY`** from **`.env.example`** into **`.env`** for production-style enrichment; the setup scripts use `demo_key` when a variable is unset (limited or placeholder behaviour).
 
 ### Troubleshooting
 
 | Issue | What to check |
 |-------|----------------|
 | Cortex not starting | `docker compose logs cortex`; `cortex-db` must pass its healthcheck |
-| No analysers found | Cortex CE ships a limited set; `[NOT FOUND]` from `make cortex-analysers` is normal |
+| No analysers found / **NOT FOUND** | Expected for **Cortex CE** for many analysers; enable what the catalog lists. For AbuseIPDB / VirusTotal / Shodan, set keys in **`.env`** (see **`.env.example`**) in a full deployment |
 | TheHive connection failing | Run `make cortex-connect-thehive` |
 | Jobs not completing | Confirm `/var/run/docker.sock` is mounted on `cortex`; inspect `docker compose logs cortex` |
+
+---
+
+## Sprint 5 — KPIs, Escalation & Operations
+
+### SOC KPI Dashboard
+
+- **Grafana:** [http://localhost:3000](http://localhost:3000) — open **Catnip Games SOC - Security Dashboard** (folder: default provisioning).
+- **Start KPI metrics server (Prometheus textfile on port 9102):** `make kpi-server` (Prometheus scrapes `host.docker.internal:9102` as job `soc_kpi`).
+- **Generate KPI report:** `make kpi-report`
+- **Check SLA-style escalations against open cases:** `make check-escalations` (dry-run: `make check-escalations-dry`)
+
+Prometheus must be able to reach the KPI server from Docker Desktop (e.g. run `kpi-server` on the host so `host.docker.internal:9102` is alive).
+
+### KPI Targets
+
+| Metric | Target | Current |
+|--------|--------|---------|
+| Alert triage time | ≤15 minutes | Tracked in TheHive |
+| Daily alert capacity | 1000/day | 10 simulated |
+| Intelligence sharing latency | <5 minutes | 1.00 seconds |
+| SLA compliance | ≥90% | Tracked via `kpi_tracker.py` |
+| Patch compliance | ≥95% | Tracked via Prometheus |
+
+### Escalation Tiers
+
+| Tier | Account | Handles | SLA |
+|------|---------|---------|-----|
+| L1 | soc.analyst@catnipgames.com | Triage, low/medium | 15 min |
+| L2 | soc.admin@catnipgames.com | High severity, breaches | 30 min |
+| L3 | IR Lead | Critical, GDPR, comms | Immediate |
+
+### Documentation Index
+
+| File | Purpose |
+|------|---------|
+| `docs/playbooks/playbook_bot_attack.md` | Bot/exploit response |
+| `docs/playbooks/playbook_account_compromise.md` | Account takeover response |
+| `docs/playbooks/playbook_social_engineering.md` | Phishing/SE response |
+| `docs/playbooks/playbook_ddos.md` | DDoS response |
+| `docs/escalation/escalation_procedures.md` | When and how to escalate |
+| `docs/runbook/operational_runbook.md` | Day-to-day SOC operations |
+
+### MITRE ATT&CK Coverage
+
+| Playbook | Tactics Covered | Key Techniques |
+|----------|-----------------|----------------|
+| Bot Attack | Initial Access, Execution, Impact | T1078, T1059, T1499 |
+| Account Compromise | Credential Access, Initial Access | T1110, T1078 |
+| Social Engineering | Initial Access, Reconnaissance | T1566, T1598 |
+| DDoS | Impact, Reconnaissance | T1498, T1499 |
+
+---
+
+## Sprint 6 — Automatic Log Generator
+
+The log generator simulates realistic security events from Catnip Games infrastructure continuously. It generates IDS alerts, firewall blocks, failed logins, game server alerts, WAF events, and DLP alerts — automatically creating TheHive cases and exporting IOCs to MISP when thresholds are breached.
+
+### Quick start
+
+```bash
+make start-logs          # Start with all integrations
+make start-logs-fast     # Start in fast mode (demo)
+make view-logs           # Watch live event feed
+make logs-status         # Check if running
+make stop-logs           # Stop generator
+```
+
+### Attack profiles
+
+| Profile | Threshold | TheHive Template | MITRE |
+|---------|-----------|------------------|-------|
+| IDS Alert | 10/30s | BOT_ATTACK | T1190 |
+| Firewall Block | 50/30s | BOT_ATTACK | T1190 |
+| Failed Login | 20/30s | ACCOUNT_COMPROMISE | T1110 |
+| Game Server | 5/30s | BOT_ATTACK | T1499 |
+| WAF Alert | 15/30s | BOT_ATTACK | T1190 |
+| DLP Alert | 3/30s | ACCOUNT_COMPROMISE | T1005 |
+
+### Log files
+
+| File | Contents |
+|------|----------|
+| `logs/combined.log` | All events |
+| `logs/ids_alert.log` | IDS alerts only |
+| `logs/firewall_block.log` | Firewall events |
+| `logs/failed_login.log` | Auth failures |
+| `logs/game_server_alert.log` | Game integrity events |
+| `logs/waf_alert.log` | WAF blocks |
+| `logs/dlp_alert.log` | Data loss events |
+
+### Grafana integration
+
+New panels added to the SOC dashboard show live event rates, IDS alert breakdown, auto-created cases count, and MISP IOC export count. All update every 15 seconds.
+
+### Scalability note
+
+In production, replace `generator.py` with a Syslog receiver or webhook endpoint to ingest real events from Snort, Suricata, pfSense, or cloud WAF. The TheHive and MISP integration code remains unchanged.
 
 ---
 
@@ -235,7 +369,7 @@ Free API keys for AbuseIPDB, VirusTotal, and Shodan are available at [abuseipdb.
   README.md             # This file
   SECURITY.md           # Security notes
   prometheus/           # prometheus.yml, alert.rules.yml
-  grafana/provisioning/ # datasources, dashboards (Node Overview)
+  grafana/provisioning/ # datasources, dashboards (Node Overview, SOC KPI)
   alertmanager/         # alertmanager.yml (console + Slack/email)
   ansible/
     playbooks/          # patch_orchestrator.yml, drift_check.yml
@@ -243,8 +377,8 @@ Free API keys for AbuseIPDB, VirusTotal, and Shodan are available at [abuseipdb.
     inventory/          # hosts.ini, dev.ini, staging.ini, prod.ini (blue/green)
   cortex/
     setup/              # init_cortex, configure_analysers, connect_thehive, verify_cortex
-    automation/         # alert_ingestor, alert_enricher, misp_exporter, kpi_tracker
-  .github/workflows/    # ci.yml (lint, build, patch, validate)
+    automation/         # alert_ingestor, alert_enricher, misp_exporter, kpi_tracker, kpi_metrics_server, escalation_manager
+  .github/workflows/    # ci.yml (lint, build, patch, validate, SOC checks)
 ```
 
 ---

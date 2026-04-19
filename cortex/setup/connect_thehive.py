@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
-"""Register Cortex as a TheHive connector."""
+"""Register Cortex as a TheHive connector.
+
+TheHive 4.x exposed POST /api/v1/connector. TheHive 5.2 (StrangeBee) does not — Cortex is
+configured via the container entrypoint (--cortex-hostnames / --cortex-keys). Use:
+
+  make cortex-connect-thehive
+
+which exports CORTEX_API_KEY from cortex_api_key.txt and recreates the thehive service.
+"""
 import json
 import os
 import sys
+import time
 
 import requests
 
@@ -34,7 +43,21 @@ def connector_paths():
 
 def connector_exists(api_key, session):
     base, _ = connector_paths()
-    r = session.get(base, headers=thehive_headers(api_key), timeout=30)
+    headers = thehive_headers(api_key)
+    r = None
+    for attempt in range(12):
+        try:
+            r = session.get(base, headers=headers, timeout=30)
+            break
+        except requests.RequestException:
+            if attempt == 11:
+                print("[FAIL] TheHive unreachable at connector URL after retries.")
+                raise
+            time.sleep(10)
+    if r is None:
+        return False, None
+    if r.status_code == 404:
+        return None, r  # TheHive 5.x: no REST connector API
     if r.status_code != 200:
         return False, r
     try:
@@ -65,6 +88,13 @@ def main():
     base, status_url = connector_paths()
 
     exists, list_resp = connector_exists(thehive_key, session)
+    if exists is None:
+        print(
+            "[OK] TheHive 5.x has no /api/v1/connector API; Cortex is set via Docker "
+            "(--cortex-hostnames/--cortex-keys). `make cortex-connect-thehive` applies it."
+        )
+        return
+
     if exists:
         print("[OK] Cortex connector already present in TheHive.")
     else:

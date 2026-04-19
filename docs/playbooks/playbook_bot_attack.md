@@ -6,6 +6,20 @@
 - SLA: 15 minutes to triage, 2 hours to contain
 - TheHive Template: BOT_ATTACK
 
+## MITRE ATT&CK Mapping
+| Tactic | Technique | ID |
+|--------|-----------|-----|
+| Initial Access | Valid Accounts | T1078 |
+| Execution | Scripting | T1059 |
+| Impact | Endpoint Denial of Service | T1499 |
+| Impact | Resource Hijacking | T1496 |
+
+## Escalation Integration
+- L1 handles: Initial triage and IP blocking
+- Escalate to L2 if: Bot affecting game economy or >100 req/sec sustained
+- Escalate to L3 if: Core game integrity compromised pre-launch
+- TheHive: Set severity=High and assign to soc.admin@catnipgames.com
+
 ## Trigger
 - IDS alert: repeated API calls from single IP
 - Game server log: abnormal matchmaking request rate

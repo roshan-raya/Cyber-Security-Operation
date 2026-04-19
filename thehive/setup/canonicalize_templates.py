@@ -68,9 +68,11 @@ def template_matches(required_id, template):
             or "social engineering" in nl
         )
     if required_id == "DDOS_INFRASTRUCTURE":
+        # Match common typos, e.g. DDOS_INFRASTUTURE (missing R)
         return (
             name == "DDOS_INFRASTRUCTURE"
             or ("ddos" in nl and "infra" in nl)
+            or ("ddos" in nl and "infrastut" in nl)
         )
     return False
 

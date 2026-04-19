@@ -6,6 +6,20 @@
 - SLA: 15 minutes to triage, 1 hour to contain
 - TheHive Template: SOCIAL_ENGINEERING
 
+## MITRE ATT&CK Mapping
+| Tactic | Technique | ID |
+|--------|-----------|-----|
+| Initial Access | Phishing | T1566 |
+| Initial Access | Spearphishing | T1598 |
+| Reconnaissance | Gather Victim Identity | T1589 |
+| Defense Evasion | Impersonation | T1656 |
+
+## Escalation Integration
+- L1 handles: Initial report, block malicious domain
+- Escalate to L2 immediately: All confirmed social engineering
+- Escalate to L3 if: Data accessed, executive targeted
+- TheHive: This is the near-breach scenario — always assign to L2
+
 ## Trigger
 - Staff report of suspicious email or message
 - Phishing link clicked by staff member
