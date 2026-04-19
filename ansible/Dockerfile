@@ -15,7 +15,7 @@ RUN http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= all_proxy= \
       openssh-client sshpass curl jq && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir ansible-core
+RUN pip install --no-cache-dir "ansible-core" "Jinja2<3.1"
 
 WORKDIR /ansible
 COPY ansible.cfg /ansible/ansible.cfg

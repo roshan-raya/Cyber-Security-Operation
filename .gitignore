@@ -1,65 +1,7 @@
-# Environment and secrets
 .env
-*.pem
-*.key
-secrets/
-
-# Python
+*.pyc
 __pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-.env.local
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
+ansible/reports/*.json
+ansible/reports/*.csv
+ansible/reports/*.prom
 .DS_Store
-Thumbs.db
-
-# Ansible
-*.retry
-.ansible/
-ansible/.ssh/
-ansible/patch.log
-ansible/keys/
-
-# Logs and temp
-*.log
-tmp/
-temp/
-
-# Grafana (runtime data, not provisioning)
-grafana/data/
-
-# Prometheus (runtime data)
-prometheus/data/
-
-# TheHive secrets
-thehive/setup/api_key.txt
-
-# MISP
-misp/setup/__pycache__/
-.misp_auth_key
-
-# Cortex
-cortex/setup/cortex_api_key.txt
-cortex/automation/ingestor_results.json
-cortex/automation/export_log.json
-cortex/automation/soc_kpi_metrics.prom
-cortex/automation/kpi_report_*.txt
-# Sprint 5
-cortex/automation/escalation_log.json
-cortex/setup/__pycache__/
-cortex/automation/__pycache__/
-
-# Log Generator
-log_generator/logs/*.log
-log_generator/state/*.json
-log_generator/state/orchestrator.pid
-log_generator/__pycache__/
