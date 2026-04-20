@@ -13,7 +13,7 @@ Ansible Control Node
      ↓
 5 Patch Target Servers (dev/staging/prod blue/green)
      ↑
-Prometheus ← metrics ← patch_metrics_exporter
+Prometheus ← metrics ← patch_metrics_exporter + log-generator (synthetic varying rates for demos)
      ↓
 Grafana (Node Overview Dashboard)
      ↓
@@ -89,6 +89,30 @@ Makefile
 | `make patch-drift` | Run drift-check playbook |
 | `make patch-report` | Print latest patch report |
 | `make metrics-test` | Verify metrics exporter endpoint |
+| `make backup` | Create pre-patch volume snapshot (use LABEL=name to tag it) |
+| `make restore` | Restore from backup snapshot (requires BACKUP_DIR=backups/path) |
+| `make patch-with-backup` | Run backup then patch in a single command |
+| `make chaos-test` | Run all chaos engineering scenarios |
+| `make benchmark` | Prove all 5 performance requirements with evidence |
+
+## Documentation Index
+
+| Document | Purpose |
+|---|---|
+| [docs/technical-architecture.md](docs/technical-architecture.md) | System architecture, components, design decisions |
+| [docs/recovery-runbook.md](docs/recovery-runbook.md) | Step-by-step operator recovery procedures |
+| [docs/process-workflow.md](docs/process-workflow.md) | Full patch lifecycle — CI and manual paths |
+| [docs/test-cases.md](docs/test-cases.md) | TC-001 through TC-017 with commands and pass criteria |
+| [docs/demo-script.md](docs/demo-script.md) | In-lab demo sequence and Q&A preparation |
+| [docs/screencast-script.md](docs/screencast-script.md) | 5-minute individual screencast script |
+| [docs/chaos-testing.md](docs/chaos-testing.md) | Chaos engineering scenarios and recovery proof |
+| [docs/onboarding.md](docs/onboarding.md) | New engineer setup guide |
+| [docs/adr/ADR-001.md](docs/adr/ADR-001.md) | Why Ansible for orchestration |
+| [docs/adr/ADR-002.md](docs/adr/ADR-002.md) | Why Docker Compose for test environment |
+| [docs/adr/ADR-003.md](docs/adr/ADR-003.md) | Why Prometheus over hosted monitoring |
+| [docs/security-review-checklist.md](docs/security-review-checklist.md) | Hardening review checklist and formal sign-off (weeks 9–10) |
+
+**CI:** Pull requests run [`.github/workflows/ci.yml`](.github/workflows/ci.yml). **Extended validation** ([`.github/workflows/extended-validation.yml`](.github/workflows/extended-validation.yml)) runs `make benchmark` and `make chaos-test` weekly and on manual workflow dispatch; it uploads evidence under Actions artifacts.
 
 ## Validation Checklist
 Run in order:
@@ -123,14 +147,25 @@ Then confirm:
 - `PatchDurationTooHigh` - fires when patch duration exceeds threshold
 - `PatchNotRunRecently` - fires when no run is detected in 24 hours
 
+> **Demo tip:** To see critical alerts arrive in real time, create a free endpoint at
+> https://webhook.site, copy the UUID, and set `ALERTMANAGER_WEBHOOK_URL=https://webhook.site/YOUR-UUID`
+> in `.env`. Restart alertmanager with `docker compose restart alertmanager`.
+> Critical alerts (PatchFailureCritical, PatchHostUnreachable) will POST there within 5 seconds.
+
 ## Recovery Procedures
-- **Rollback**:
-  `ansible-playbook roles/patch/tasks/rollback.yml`
-- **Backup**: create Docker volume snapshots before patch windows
-- **Recovery**:
-  1. Restore relevant Docker volumes
-  2. Start stack with `docker compose --profile sim up -d`
-  3. Re-run `make validate` and `make validate-reports`
+Full step-by-step operator runbook: [docs/recovery-runbook.md](docs/recovery-runbook.md)
+
+Quick reference:
+
+| Action | Command |
+|---|---|
+| Pre-patch backup | `make backup LABEL=pre-patch` |
+| Restore from backup | `make restore BACKUP_DIR=backups/<timestamp>` |
+| Rollback a single host | `docker compose exec ansible ansible-playbook -i inventory/hosts.ini playbooks/patch_orchestrator.yml --limit <host> -e rollback_enabled=true` |
+| Restart full stack | `docker compose --profile sim up -d && make validate` |
+| Check patch report | `make patch-report` |
+
+For backup + patch in one command: `make patch-with-backup`
 
 ## Troubleshooting
 | Issue | Fix |
