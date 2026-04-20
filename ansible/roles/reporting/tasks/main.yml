@@ -57,17 +57,7 @@
   vars:
     _unique_envs: "{{ patch_report_list | default([]) | map(attribute='environment') | list | unique | sort }}"
     _patch_agg_env: >-
-      {% if _unique_envs | length == 0 -%}
-      {{ patch_environment | default('unspecified') }}
-      {%- elif _unique_envs | length == 1 -%}
-      {{ _unique_envs[0] }}
-      {%- elif 'blue' in _unique_envs -%}
-      blue
-      {%- elif 'green' in _unique_envs -%}
-      green
-      {%- else -%}
-      {{ patch_environment | default('unspecified') }}
-      {%- endif %}
+      {% if _unique_envs | length == 0 -%} {{ patch_environment | default('unspecified') }}{%- elif _unique_envs | length == 1 -%} {{ _unique_envs[0] }}{%- elif 'blue' in _unique_envs -%} blue{%- elif 'green' in _unique_envs -%} green{%- else -%} {{ patch_environment | default('unspecified') }}{%- endif %}
 
 - name: Write patch report JSON (timestamped)
   ansible.builtin.copy:
@@ -110,11 +100,21 @@
 
 - name: Merge current run into patch audit history (retain last 10)
   ansible.builtin.set_fact:
-    patch_audit_runs_final: "{{ (patch_audit_prior + [patch_audit_new_entry])[-10:] }}"
+    patch_audit_runs_final: >-
+      {{
+        (
+          (
+            patch_audit_prior
+            if (patch_audit_prior is sequence and patch_audit_prior is not string and patch_audit_prior is not mapping)
+            else []
+          )
+          + [patch_audit_new_entry]
+        )[-10:]
+      }}
   vars:
     patch_audit_prior: >-
       {{
-        (patch_audit_slurp.content | b64decode | from_json | default([]))
+        (patch_audit_slurp.content | b64decode | from_json)
         if (patch_audit_stat.stat.exists | default(false)) and (patch_audit_slurp is defined)
         else []
       }}

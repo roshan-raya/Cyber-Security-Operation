@@ -29,7 +29,8 @@
   ansible.builtin.service:
     name: ssh
     state: started
-  ignore_errors: true
+  register: rollback_ssh_service_result
+  failed_when: false
   # Why: SSH is the only critical service we can verify from inside Ansible.
   # If SSH is down after rollback, the host is effectively unreachable.
 
