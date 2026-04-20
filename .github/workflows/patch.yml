@@ -32,11 +32,34 @@ jobs:
         run: sleep 30
 
       - name: Run patch
+        id: patch_run
         run: make patch
+
+      - name: Validate fleet size and report gates
+        id: validate_post_patch
+        run: |
+          make validate-patch-fleet
+          make validate-reports
 
       - name: Show report
         run: make patch-report
         continue-on-error: true
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "::error::Patch Orchestration workflow failed — open this run in the Actions tab for logs."
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            curl -sfS -X POST -H "Content-type: application/json" \
+              --data "{\"text\":\"Patch Orchestration failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              "$SLACK_WEBHOOK_URL" || echo "Slack webhook post failed (non-fatal)"
+          fi
+
+      - name: Trigger rollback on patch failure
+        if: failure() && steps.patch_run.outcome == 'failure'
+        run: make rollback
 
       - name: Tear down
         if: always()

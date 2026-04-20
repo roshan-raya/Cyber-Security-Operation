@@ -1,0 +1,11 @@
+---
+# Operator / CI rollback after patch failure (runs baseline package reinstall on all targets).
+- name: Rollback patch targets to baseline packages
+  hosts: all
+  strategy: free
+  gather_facts: false
+  tasks:
+    - name: Apply rollback tasks from patch role
+      ansible.builtin.import_role:
+        name: patch
+        tasks_from: rollback

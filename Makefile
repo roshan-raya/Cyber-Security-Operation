@@ -1,4 +1,4 @@
-.PHONY: up up-sim down logs status clean lint-prometheus validate validate-reports patch patch-dryrun patch-health patch-staging patch-production patch-blue patch-green patch-canary patch-immutable patch-drift patch-report metrics-test
+.PHONY: up up-sim down logs status clean lint-prometheus validate validate-reports validate-patch-fleet patch rollback patch-dryrun patch-health patch-staging patch-production patch-blue patch-green patch-canary patch-immutable patch-drift patch-report metrics-test
 
 up:
 	docker compose up -d prometheus grafana alertmanager
@@ -61,6 +61,15 @@ validate-reports:
 	grep "\"failed\": true" /ansible/reports/patch_report_latest.json && { echo "FAIL: Some hosts failed"; exit 1; } || echo "No failed hosts"; \
 	echo "=== PASS ==="'
 
+# Ensures the patch report includes at least 5 hosts (sim fleet / concurrent capacity SLA).
+validate-patch-fleet:
+	docker compose exec ansible sh -lc '\
+		test -f /ansible/reports/patch_report_latest.json || { echo "FAIL: patch_report_latest.json missing"; exit 1; }; \
+		N=$$(jq ".hosts | length" /ansible/reports/patch_report_latest.json); \
+		echo "Hosts in patch report: $$N (required: >= 5 for concurrent updates)"; \
+		test "$$N" -ge 5 || { echo "FAIL: fewer than 5 hosts in report"; exit 1; }; \
+		echo "[PASS] Minimum 5-host patch fleet (Ansible forks=$$(grep -E "^forks" /ansible/ansible.cfg || true))"'
+
 patch:
 	docker compose exec ansible rm -f /ansible/reports/patch_report_latest.json /ansible/reports/patch_metrics.prom
 	docker compose exec ansible sh -c 'ENV='"$(ENV)"'; LIMIT='"$(LIMIT)"'; \
@@ -71,6 +80,9 @@ patch:
 	else \
 	  ansible-playbook -i inventory/hosts.ini playbooks/patch_orchestrator.yml; \
 	fi'
+
+rollback:
+	docker compose exec ansible ansible-playbook -i inventory/hosts.ini playbooks/rollback.yml
 
 patch-dryrun:
 	docker compose exec ansible ansible-playbook playbooks/patch_dryrun.yml

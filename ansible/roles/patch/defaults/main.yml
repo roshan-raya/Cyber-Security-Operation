@@ -1,0 +1,5 @@
+---
+rollback_enabled: false
+rollback_packages:
+  - curl
+  - ca-certificates

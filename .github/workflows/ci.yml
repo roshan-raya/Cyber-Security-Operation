@@ -41,8 +41,11 @@ jobs:
         run: |
           docker compose exec -T ansible sh -lc \
             "ansible-playbook -i inventory/hosts.ini playbooks/patch_orchestrator.yml --syntax-check"
+          docker compose exec -T ansible sh -lc \
+            "ansible-playbook -i inventory/hosts.ini playbooks/rollback.yml --syntax-check"
 
       - name: Run patch orchestration
+        id: patch_run
         run: make patch
 
       - name: Validate report gates
@@ -59,6 +62,25 @@ jobs:
             awk "BEGIN {exit !(${DURATION} <= 7200)}" || { echo "FAIL: Duration > 2h"; exit 1; }
             test "${FAILED}" -eq 0 || { echo "FAIL: Failed hosts detected"; exit 1; }
           '
+
+      - name: Validate minimum concurrent patch fleet (>=5 hosts)
+        run: make validate-patch-fleet
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "::error::CI workflow failed — inspect the failed step logs above."
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            curl -sfS -X POST -H "Content-type: application/json" \
+              --data "{\"text\":\"Patch CI failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              "$SLACK_WEBHOOK_URL" || echo "Slack webhook post failed (non-fatal)"
+          fi
+
+      - name: Trigger rollback on patch failure
+        if: failure() && steps.patch_run.outcome == 'failure'
+        run: make rollback
 
       - name: Show report snippet
         run: |
