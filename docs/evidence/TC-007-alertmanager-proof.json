@@ -1,0 +1,92 @@
+[
+    {
+        "annotations": {
+            "summary": "Patch run failed for host patch-target-1"
+        },
+        "endsAt": "2026-04-19T19:20:01.162Z",
+        "fingerprint": "11e1a0184a6d71d2",
+        "receivers": [
+            {
+                "name": "console"
+            }
+        ],
+        "startsAt": "2026-04-19T19:14:01.162Z",
+        "status": {
+            "inhibitedBy": [],
+            "silencedBy": [],
+            "state": "active"
+        },
+        "updatedAt": "2026-04-19T19:16:01.639Z",
+        "generatorURL": "http://13594191a646:9090/graph?g0.expr=patch_host_success+%3D%3D+0&g0.tab=1",
+        "labels": {
+            "alertname": "PatchFailure",
+            "environment": "unspecified",
+            "group": "all",
+            "host": "patch-target-1",
+            "instance": "ansible:9101",
+            "job": "patch_metrics",
+            "role": "patch-orchestration",
+            "severity": "warning"
+        }
+    },
+    {
+        "annotations": {
+            "description": "Patch compliance is 80% (target >= 95%).",
+            "summary": "Patch compliance below 95%"
+        },
+        "endsAt": "2026-04-19T19:20:17.808Z",
+        "fingerprint": "17c95cbab5e62b14",
+        "receivers": [
+            {
+                "name": "console"
+            }
+        ],
+        "startsAt": "2026-04-19T19:14:17.808Z",
+        "status": {
+            "inhibitedBy": [],
+            "silencedBy": [],
+            "state": "active"
+        },
+        "updatedAt": "2026-04-19T19:16:18.284Z",
+        "generatorURL": "http://13594191a646:9090/graph?g0.expr=patch_compliance_percentage+%3C+95&g0.tab=1",
+        "labels": {
+            "alertname": "PatchComplianceBelow95",
+            "environment": "unspecified",
+            "group": "all",
+            "instance": "ansible:9101",
+            "job": "patch_metrics",
+            "role": "patch-orchestration",
+            "severity": "warning"
+        }
+    },
+    {
+        "annotations": {
+            "summary": "Patch run failed for host patch-target-1 (critical)"
+        },
+        "endsAt": "2026-04-19T19:19:17.462Z",
+        "fingerprint": "a113d447a6d3a21e",
+        "receivers": [
+            {
+                "name": "webhook-critical"
+            }
+        ],
+        "startsAt": "2026-04-19T19:15:17.462Z",
+        "status": {
+            "inhibitedBy": [],
+            "silencedBy": [],
+            "state": "active"
+        },
+        "updatedAt": "2026-04-19T19:15:17.940Z",
+        "generatorURL": "http://13594191a646:9090/graph?g0.expr=patch_host_success+%3D%3D+0&g0.tab=1",
+        "labels": {
+            "alertname": "PatchFailureCritical",
+            "environment": "unspecified",
+            "group": "all",
+            "host": "patch-target-1",
+            "instance": "ansible:9101",
+            "job": "patch_metrics",
+            "role": "patch-orchestration",
+            "severity": "critical"
+        }
+    }
+]

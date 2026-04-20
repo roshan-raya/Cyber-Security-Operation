@@ -1,0 +1,73 @@
+# Regression-style checks: benchmark (5 performance requirements) + chaos suite.
+# Does not run on every PR — use nightly schedule and/or workflow_dispatch to save CI minutes.
+#
+# How this relates to the main pipeline (.github/workflows/ci.yml):
+#   - CI proves the happy path (lint, compose up, patch orchestrator, report gates).
+#   - This workflow is the “weekend drill”: scripts/benchmark.sh + scripts/chaos-test.sh against the
+#     same docker-compose sim profile, so performance and failure modes stay honest as the stack evolves.
+
+name: Extended validation
+
+on:
+  # Manual full regression (benchmark + chaos). Inputs are avoided so the same
+  # workflow runs cleanly on schedule without the inputs context.
+  workflow_dispatch: {}
+  schedule:
+    # Monday 03:15 UTC — change to "15 3 * * *" for daily, or remove this block for manual-only
+    - cron: "15 3 * * 1"
+
+concurrency:
+  group: extended-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark-and-chaos:
+    name: Benchmark and chaos tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make jq python3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build sim images
+        run: docker compose --profile sim build
+
+      - name: Start stack
+        run: |
+          cp .env.example .env
+          docker compose --profile sim up -d
+          sleep 45
+
+      - name: Health sanity check
+        run: make validate
+
+      - name: Run benchmark
+        run: make benchmark
+
+      - name: Run chaos tests
+        run: make chaos-test
+
+      - name: Upload evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extended-validation-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            docs/evidence/performance-report.md
+            docs/evidence/chaos/
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile sim down -v

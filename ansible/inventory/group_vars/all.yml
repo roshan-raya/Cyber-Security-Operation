@@ -1,3 +1,16 @@
 ---
 # Global vars for patch playbooks
 ansible_python_interpreter: /usr/bin/python3
+
+# ── Rollback defaults ──────────────────────────────────────────────────────
+# rollback_enabled must be explicitly set true per-run via -e flag.
+# It never auto-enables so a failed patch does not silently downgrade production.
+rollback_enabled: false
+
+# rollback_packages is populated at runtime by the pre-patch snapshot task.
+# Default is empty list — rollback.yml will refuse to run if this is empty.
+rollback_packages: []
+
+# ── Patch environment defaults ────────────────────────────────────────────
+patch_environment: "unspecified"
+patch_group: "all"

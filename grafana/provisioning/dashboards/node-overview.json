@@ -293,7 +293,7 @@
       "id": 10,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "patch_run_duration_seconds", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "max(patch_run_duration_seconds{environment=~\"$environment\"})", "refId": "A"}],
       "title": "Patch Run Duration",
       "type": "stat"
     },
@@ -302,19 +302,39 @@
       "fieldConfig": {
         "defaults": {
           "color": {"mode": "thresholds"},
+          "custom": {"align": "auto", "inspect": false},
           "mappings": [],
           "thresholds": {"mode": "absolute", "steps": [{"color": "text", "value": null}]},
-          "unit": "dateTimeFromNow"
+          "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Value"}, "properties": [{"id": "unit", "value": "dateTimeAsLocal"}, {"id": "decimals", "value": 0}]},
+          {"matcher": {"id": "byName", "options": "instance"}, "properties": [{"id": "unit", "value": "none"}]},
+          {"matcher": {"id": "byName", "options": "job"}, "properties": [{"id": "unit", "value": "none"}]}
+        ]
       },
-      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 12},
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 16},
       "id": 11,
-      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "Value"}]},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "patch_last_run_timestamp * 1000", "refId": "A"}],
-      "title": "Last Patch Timestamp",
-      "type": "stat"
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(10, patch_run_audit_timestamp)", "format": "table", "instant": true, "refId": "A"}],
+      "title": "Patch run audit (last 10)",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "role": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -327,11 +347,11 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 12},
+      "gridPos": {"h": 4, "w": 18, "x": 6, "y": 12},
       "id": 12,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(patch_host_success) / count(patch_host_success) * 100", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(patch_host_success{environment=~\"$environment\"}) / count(patch_host_success{environment=~\"$environment\"}) * 100", "refId": "A"}],
       "title": "Patch Success Rate %",
       "type": "stat"
     },
@@ -346,11 +366,11 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 16},
+      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 23},
       "id": 13,
       "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "Value"}]},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "patch_host_success", "format": "table", "instant": true, "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "patch_host_success{environment=~\"$environment\"}", "format": "table", "instant": true, "refId": "A"}],
       "title": "Per-host Patch Success",
       "type": "table"
     },
@@ -367,11 +387,11 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 20},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 27},
       "id": 14,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "patch_compliance_percentage{environment=~\"$environment\"}", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "max(patch_compliance_percentage{environment=~\"$environment\", environment=~\"^(blue|green)$\"}) or max(patch_compliance_percentage{environment=~\"$environment\", environment!~\"^(blue|green)$\"})", "refId": "A"}],
       "title": "Patch Compliance %",
       "type": "stat"
     },
@@ -386,11 +406,11 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 20},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 27},
       "id": 15,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(patch_host_success{environment=~\"$environment\"} == 0)", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(patch_host_success{environment=~\"$environment\"} == 0) or vector(0)", "refId": "A"}],
       "title": "Failed Hosts Count",
       "type": "stat"
     },
@@ -407,11 +427,11 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 20},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 27},
       "id": 16,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg(patch_host_success{group=\"blue\"}) * 100", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg(patch_host_success{environment=\"blue\"}) * 100 or vector(0)", "refId": "A"}],
       "title": "Blue Success %",
       "type": "stat"
     },
@@ -428,11 +448,11 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 20},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 27},
       "id": 17,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "10.0.0",
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg(patch_host_success{group=\"green\"}) * 100", "refId": "A"}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg(patch_host_success{environment=\"green\"}) * 100 or vector(0)", "refId": "A"}],
       "title": "Green Success %",
       "type": "stat"
     }
@@ -445,6 +465,7 @@
     "list": [
       {
         "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
         "hide": 0,
         "includeAll": true,
         "label": "Environment",
@@ -465,6 +486,6 @@
   "timezone": "",
   "title": "Node Overview",
   "uid": "node-overview",
-  "version": 1,
+  "version": 6,
   "weekStart": ""
 }

@@ -1,0 +1,183 @@
+---
+# patch_canary.yml — Phased canary rollout with automatic halt on failure
+#
+# Phase structure:
+#   Phase 1: canary  — 1 host (patch-target-1)
+#   Phase 2: batch   — 2 hosts (patch-target-2, patch-target-3)
+#   Phase 3: full    — remaining hosts (patch-target-4, patch-target-5)
+#
+# Auto-halt logic:
+#   max_fail_percentage: 0 on canary — any failure stops the entire run
+#   max_fail_percentage: 25 on batch — >25% failure stops the run
+#   max_fail_percentage: 20 on full  — >20% failure stops the run
+#
+# Health gate between phases:
+#   A health check play runs between each phase.
+#   If health check fails, subsequent phases do not run.
+#
+# Usage:
+#   make patch-canary-phased
+#   or: ansible-playbook -i inventory/hosts.ini playbooks/patch_canary.yml
+
+# ═══════════════════════════════════════════════════
+# PHASE 1 — Canary (single host, zero tolerance)
+# ═══════════════════════════════════════════════════
+- name: "Phase 1 — Canary patch (patch-target-1)"
+  hosts: canary
+  serial: 1
+  max_fail_percentage: 0
+  # Why serial: 1 and max_fail_percentage: 0:
+  # The canary is our early warning. Any failure here means the patch is
+  # unsafe and the entire run must stop before touching more hosts.
+  gather_facts: true
+
+  vars:
+    patch_environment: "{{ patch_environment | default('canary') }}"
+    patch_group: "canary"
+    patch_phase: "1-canary"
+
+  roles:
+    - common
+    - health_check
+    - patch
+    - security_scan
+
+  post_tasks:
+    - name: Canary gate - stop rollout if canary patch failed
+      ansible.builtin.assert:
+        that:
+          - not (patch_failed | default(false) | bool)
+        fail_msg: "Canary gate FAILED - halting phased rollout."
+
+- name: "Phase 1 reporting"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    patch_group: "canary"
+    patch_phase: "1-canary"
+  roles:
+    - reporting
+
+# ═══════════════════════════════════════════════════
+# HEALTH GATE 1 — Verify canary before proceeding
+# ═══════════════════════════════════════════════════
+- name: "Health gate — verify canary before batch phase"
+  hosts: canary
+  gather_facts: false
+  # Why this gate exists:
+  # Even if Phase 1 technically succeeded, we verify the canary host is
+  # still healthy before exposing the batch group to the same patch.
+  tasks:
+    - name: Ping canary host post-patch
+      ansible.builtin.ping:
+
+    - name: Verify canary uptime is non-zero
+      ansible.builtin.command: uptime
+      changed_when: false
+      register: canary_uptime
+
+    - name: Confirm canary passed health gate
+      ansible.builtin.debug:
+        msg: >
+          Canary health gate PASSED — {{ inventory_hostname }}.
+          Uptime: {{ canary_uptime.stdout }}.
+          Proceeding to batch phase.
+
+# ═══════════════════════════════════════════════════
+# PHASE 2 — Batch (2 hosts, 25% failure tolerance)
+# ═══════════════════════════════════════════════════
+- name: "Phase 2 — Batch patch (patch-target-2, patch-target-3)"
+  hosts: dc1_batch
+  serial: 2
+  max_fail_percentage: 25
+  # Why 25%: with 2 hosts, this means 0 failures allowed in practice
+  # (1 failure = 50% which exceeds threshold). Keeps batch strict.
+  gather_facts: true
+
+  vars:
+    patch_environment: "{{ patch_environment | default('batch') }}"
+    patch_group: "batch"
+    patch_phase: "2-batch"
+
+  roles:
+    - common
+    - health_check
+    - patch
+    - security_scan
+
+  post_tasks:
+    - name: Batch gate - stop rollout if any batch host failed
+      ansible.builtin.assert:
+        that:
+          - not (patch_failed | default(false) | bool)
+        fail_msg: "Batch gate FAILED - halting phased rollout."
+
+- name: "Phase 2 reporting"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    patch_group: "batch"
+    patch_phase: "2-batch"
+  roles:
+    - reporting
+
+# ═══════════════════════════════════════════════════
+# HEALTH GATE 2 — Verify batch before full rollout
+# ═══════════════════════════════════════════════════
+- name: "Health gate — verify batch before full rollout"
+  hosts: dc1_batch
+  gather_facts: false
+  tasks:
+    - name: Ping batch hosts post-patch
+      ansible.builtin.ping:
+
+    - name: Verify batch host uptime
+      ansible.builtin.command: uptime
+      changed_when: false
+      register: batch_uptime
+
+    - name: Confirm batch passed health gate
+      ansible.builtin.debug:
+        msg: >
+          Batch health gate PASSED — {{ inventory_hostname }}.
+          Proceeding to full rollout phase.
+
+# ═══════════════════════════════════════════════════
+# PHASE 3 — Full rollout (remaining hosts)
+# ═══════════════════════════════════════════════════
+- name: "Phase 3 — Full rollout (patch-target-4, patch-target-5)"
+  hosts: dc2
+  serial: "50%"
+  max_fail_percentage: 20
+  # Why serial 50%: patches half the remaining hosts at a time.
+  # If DC2 has 2 hosts, this means 1 at a time — controlled rollout.
+  # Why 20%: slightly more tolerant than batch since canary + batch
+  # already validated the patch is safe.
+  gather_facts: true
+
+  vars:
+    patch_environment: "{{ patch_environment | default('production') }}"
+    patch_group: "full"
+    patch_phase: "3-full"
+
+  roles:
+    - common
+    - health_check
+    - patch
+    - security_scan
+
+  post_tasks:
+    - name: Full rollout gate - fail phase if host patch failed
+      ansible.builtin.assert:
+        that:
+          - not (patch_failed | default(false) | bool)
+        fail_msg: "Full rollout gate FAILED - host patch did not complete cleanly."
+
+- name: "Phase 3 reporting — final consolidated report"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    patch_group: "all"
+    patch_phase: "3-full"
+  roles:
+    - reporting

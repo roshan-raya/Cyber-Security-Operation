@@ -1,0 +1,22 @@
+---
+# Security scan defaults
+# These can be overridden per-environment via group_vars or -e flags
+
+# Minimum severity level to report (UNKNOWN, LOW, MEDIUM, HIGH, CRITICAL)
+scan_severity_threshold: "HIGH"
+
+# Fail the play if critical CVEs found (set false in dev/staging)
+scan_fail_on_critical: false
+
+# Trivy install method: package or binary
+trivy_install_method: "binary"
+
+# Trivy binary version to install
+trivy_version: "0.50.1"
+
+# Where to write scan results on the target host
+scan_output_dir: "/tmp/trivy-results"
+
+# Maximum CVEs before alerting (used in metrics)
+scan_critical_threshold: 0
+scan_high_threshold: 5

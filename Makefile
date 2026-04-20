@@ -1,4 +1,7 @@
-.PHONY: up up-sim down logs status clean lint-prometheus validate validate-reports validate-patch-fleet patch rollback patch-dryrun patch-health patch-staging patch-production patch-blue patch-green patch-canary patch-immutable patch-drift patch-report metrics-test
+# Makefile shortcuts for docker compose + Ansible patch flows.
+# Pairs with: docker-compose.yml (services/profiles), ansible/playbooks/patch_orchestrator.yml (real work),
+# prometheus/ + grafana/ + alertmanager/ (observability), scripts/*.sh (chaos, backup, benchmarks).
+.PHONY: up up-sim down logs status clean backup restore patch-with-backup lint-prometheus validate validate-reports patch patch-dryrun patch-health patch-staging patch-production patch-blue patch-green patch-canary patch-canary-phased patch-immutable patch-drift patch-report metrics-test verify-report chaos-test chaos-test-1 chaos-test-2 chaos-test-3 benchmark
 
 up:
 	docker compose up -d prometheus grafana alertmanager
@@ -17,6 +20,20 @@ status:
 
 clean:
 	docker compose down -v
+
+backup:
+	@./scripts/backup.sh $(if $(LABEL),$(LABEL),pre-patch)
+
+restore:
+	@if [ -z "$(BACKUP_DIR)" ]; then echo "Usage: make restore BACKUP_DIR=backups/<timestamp>"; exit 1; fi
+	@./scripts/restore.sh $(BACKUP_DIR)
+
+patch-with-backup:
+	@echo "=== Pre-patch backup ==="
+	@$(MAKE) backup LABEL=pre-patch-$(shell date +%Y%m%d_%H%M%S)
+	@echo ""
+	@echo "=== Patch run ==="
+	@$(MAKE) patch
 
 lint-prometheus:
 	docker compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
@@ -107,6 +124,16 @@ patch-canary:
 	@echo "Canary passed; running full patch..."
 	docker compose exec ansible ansible-playbook -i inventory/hosts.ini playbooks/patch_orchestrator.yml
 
+patch-canary-phased:
+	@echo "=== Phased canary rollout: canary → batch → full ==="
+	@echo "Phase 1: canary (1 host, zero tolerance)"
+	@echo "Phase 2: batch  (2 hosts, 25% tolerance)"
+	@echo "Phase 3: full   (remaining, 20% tolerance)"
+	@echo ""
+	docker compose exec ansible \
+		ansible-playbook -i inventory/hosts.ini playbooks/patch_canary.yml \
+		$(if $(ENVIRONMENT),-e patch_environment=$(ENVIRONMENT),)
+
 patch-immutable:
 	@echo "Recreating patch-target-1 (immutable strategy)..."
 	docker compose --profile sim up -d --force-recreate patch-target-1
@@ -121,3 +148,21 @@ patch-report:
 
 metrics-test:
 	@docker compose exec ansible curl -sf http://localhost:9101/metrics || (echo "Metrics exporter not reachable. Is ansible container up?"; exit 1)
+
+verify-report:
+	@./scripts/verify-report.sh
+
+chaos-test:
+	@./scripts/chaos-test.sh $(if $(SCENARIO),$(SCENARIO),all)
+
+chaos-test-1:
+	@./scripts/chaos-test.sh scenario1
+
+chaos-test-2:
+	@./scripts/chaos-test.sh scenario2
+
+chaos-test-3:
+	@./scripts/chaos-test.sh scenario3
+
+benchmark:
+	@./scripts/benchmark.sh

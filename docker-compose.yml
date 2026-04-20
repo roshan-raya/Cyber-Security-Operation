@@ -1,3 +1,14 @@
+# Local “mini production” for patch + observability demos.
+#
+# Think of it as three rings that talk to each other:
+#   1) Monitoring: prometheus, grafana, alertmanager (always-on stack; `docker compose up` without profile).
+#   2) Simulation (--profile sim): ansible control node + fake SSH “patch targets” + node exporters.
+#   3) Reports/metrics volume: ansible_reports — patch_orchestrator writes JSON/CSV/.prom here; metrics_exporter.py
+#      in the ansible container reads those files and Prometheus scrapes :9101 (see prometheus/prometheus.yml).
+#
+# Common flows:
+#   - `make up-sim` then `make patch` — exercises ansible/playbooks/patch_orchestrator.yml end-to-end.
+#   - CI: .github/workflows/ci.yml builds this compose project and runs the same patch + report checks.
 services:
   prometheus:
     image: prom/prometheus:v2.52.0
@@ -20,6 +31,8 @@ services:
       - monitoring
     depends_on:
       alertmanager:
+        condition: service_healthy
+      log-generator:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
@@ -82,6 +95,37 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # Synthetic varying metrics (log/event–like rates) for live-looking Grafana charts — demo only.
+  # Service name: log-generator (image runs scripts/log_metrics_exporter.py on :9104). If you
+  # expected a container named log_api, this is the same role in this stack.
+  log-generator:
+    image: python:3.12-slim-bookworm
+    container_name: log-generator
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      - /tmp
+    command: ["python", "/app/log_metrics_exporter.py"]
+    volumes:
+      - ./scripts/log_metrics_exporter.py:/app/log_metrics_exporter.py:ro
+    expose:
+      - "9104"
+    networks:
+      - monitoring
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9104/metrics', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
   node-exporter-1:
     image: prom/node-exporter:v1.8.0
     profiles:
@@ -135,10 +179,26 @@ services:
     container_name: ansible
     profiles:
       - sim
+    # Option 2: PID 1 stays alive for `docker compose exec`; metrics_exporter on :9101 for Prometheus.
+    # (Same idea as `python3 … & exec tail -f /dev/null`, plus SSH key bootstrap from ansible/entrypoint.sh
+    # because this override replaces the image ENTRYPOINT.)
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+          set -e
+          if [ ! -f /ansible/.ssh/id_rsa ]; then
+            mkdir -p /ansible/.ssh
+            ssh-keygen -t ed25519 -f /ansible/.ssh/id_rsa -N ""
+          fi
+          cp /ansible/.ssh/id_rsa.pub /ssh_pubkey/id_rsa.pub
+          python3 /ansible/metrics_exporter.py &
+          exec tail -f /dev/null
     volumes:
       - ./ansible/playbooks:/ansible/playbooks:ro
       - ./ansible/inventory:/ansible/inventory:ro
       - ./ansible/roles:/ansible/roles:ro
+      - ./ansible/metrics_exporter.py:/ansible/metrics_exporter.py:ro
       - ansible_reports:/ansible/reports
       - ansible_ssh:/ansible/.ssh
       - ssh_pubkey:/ssh_pubkey

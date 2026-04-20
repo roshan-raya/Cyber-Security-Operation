@@ -1,3 +1,9 @@
+# Alert rules: Prometheus evaluates these against scraped metrics (see prometheus.yml scrape jobs).
+# When a rule is “firing”, Prometheus sends it to Alertmanager (alertmanager/alertmanager.yml).
+#
+# Patch-related metrics (patch_*) are produced by the reporting role template
+# ansible/roles/reporting/templates/patch_metrics.prom.j2 and served via ansible/metrics_exporter.py.
+# If you change metric names or labels there, update these expr blocks and Grafana queries together.
 groups:
   - name: example
     interval: 1m
@@ -68,3 +74,29 @@ groups:
           severity: warning
         annotations:
           summary: "Patch compliance below 80% (current: {{ $value }}%)"
+
+  - name: security_scan_alerts
+    interval: 1m
+    rules:
+      - alert: CriticalCVEsRemaining
+        expr: patch_scan_critical_cves > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CVEs remain on host {{ $labels.host }} after patching"
+          description: >
+            {{ $value }} critical CVE(s) detected on {{ $labels.host }}.
+            Patching did not resolve all critical vulnerabilities.
+            Review Trivy scan results immediately.
+
+      - alert: HighCVEsAboveThreshold
+        expr: patch_scan_high_cves > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CVE count above threshold on {{ $labels.host }}"
+          description: >
+            {{ $value }} high-severity CVE(s) detected on {{ $labels.host }}.
+            Threshold is 5. Review and schedule remediation.

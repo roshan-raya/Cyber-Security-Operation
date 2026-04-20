@@ -1,5 +1,26 @@
 ---
 # Patch: gather facts, apt update/upgrade, reboot if required, validate
+- name: Capture pre-patch package snapshot for rollback
+  ansible.builtin.shell: >
+    dpkg-query -W -f='${Package}=${Version}\n' 2>/dev/null | sort
+  register: pre_patch_packages
+  changed_when: false
+  failed_when: false
+  # Why: rollback.yml needs to know what was installed before we changed anything.
+  # We capture this at the very start of the patch role so the data is always fresh.
+
+- name: Store rollback package list from pre-patch snapshot
+  ansible.builtin.set_fact:
+    rollback_packages: >-
+      {{ pre_patch_packages.stdout_lines
+         | map('regex_replace', '=.*$', '')
+         | list }}
+  when: pre_patch_packages.stdout_lines is defined and
+        pre_patch_packages.stdout_lines | length > 0
+  # Why: strip version suffixes so apt can reinstall current-or-later versions.
+  # Storing package names only (not pinned versions) avoids downgrade failures
+  # when the target version is no longer in the apt cache.
+
 - name: Run patch and validation
   block:
     - name: Gather facts

@@ -1,0 +1,2 @@
+Before: 0
+0 lines. After kill: DOWN. After restart: 47 lines.

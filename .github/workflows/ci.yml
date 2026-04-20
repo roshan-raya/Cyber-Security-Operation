@@ -1,3 +1,8 @@
+# Continuous integration for this repo’s patch-management demo stack.
+#
+# Rough narrative of the job below: install linters → build compose sim images → bring the stack up
+# → ansible-lint + syntax-check → run the same `make patch` path developers use → assert reports/metrics.
+# If this workflow is red, compare with local `make up-sim` + `make patch` + `make validate-reports`.
 name: CI - Patch Management
 
 on:
@@ -88,7 +93,7 @@ jobs:
       - name: Show report snippet
         run: |
           docker compose exec -T ansible sh -lc \
-            'jq "{compliance_percentage, duration_seconds, hosts: [.hosts[] | {host, patched, failed}]}" /ansible/reports/patch_report_latest.json'
+            'jq "{compliance_percentage, duration_seconds, hosts: [.hosts[] | {host, changed, failed}]}" /ansible/reports/patch_report_latest.json'
 
       - name: Tear down
         if: always()

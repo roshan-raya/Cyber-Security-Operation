@@ -76,3 +76,11 @@ Node-exporter metrics in this repository are **container-scoped** (two simulated
 - **Metrics internal-only:** The patch metrics exporter (port 9101) is not published to the host; only Prometheus and other services on the `monitoring` network can scrape it. No authentication is required on the exporter; rely on network isolation in production.
 - **Production TLS recommendation:** Expose Prometheus and Grafana only via a reverse proxy (e.g. nginx, Traefik) with TLS termination and access control. Do not publish Alertmanager or the metrics exporter to the internet. Use TLS for all operator-facing endpoints.
 - **Patch targets:** Root SSH login is disabled (`PermitRootLogin no`); `StrictModes yes` is set. Ansible runs as non-root and uses `ansible_become: true` (sudo) for privileged tasks only.
+
+---
+
+## 9. Formal security review (weeks 9–10)
+
+For coursework or release gates, complete the repeatable checklist and sign-off in **[docs/security-review-checklist.md](docs/security-review-checklist.md)**. It covers secrets, containers, network exposure, Trivy post-patch scanning, recovery, and monitoring SLAs—without replacing a third-party audit.
+
+**Automation:** The GitHub Actions workflow **Extended validation** (`.github/workflows/extended-validation.yml`) runs `make benchmark` and `make chaos-test` on a weekly schedule and on manual dispatch; artifacts include `docs/evidence/` outputs.

@@ -1,6 +1,10 @@
-# Lint policy for CI: ansible.cfg uses roles_path=/ansible/roles (Docker-only).
-# GitHub Actions sets ANSIBLE_ROLES_PATH in .github/workflows/ci.yml so syntax-check finds roles.
-# Stylistic rules below are deferred to Ansible playbook/role owners; re-enable as they align code.
+# What this file is: the “house rules” ansible-lint uses when CI runs `ansible-lint ansible/`
+# (see .github/workflows/ci.yml). It does not change how playbooks run — only what fails the build.
+#
+# How it connects elsewhere:
+#   - ansible/ansible.cfg sets roles_path for the container layout; locally/CI we also export
+#     ANSIBLE_ROLES_PATH so `ansible-playbook --syntax-check` resolves roles the same way.
+#   - When you tighten skip_list entries, expect CI to start failing until playbooks/roles match.
 ---
 skip_list:
   - var-naming

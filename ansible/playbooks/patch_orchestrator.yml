@@ -1,4 +1,15 @@
 ---
+# Patch orchestrator — one playbook, two plays, one story:
+#   Play 1 (hosts: all): patch every inventory host (roles: common → health_check → patch → security_scan).
+#   Play 2 (hosts: localhost): reporting role writes reports + Prometheus textfile metrics under /ansible/reports.
+#
+# Why two plays: strategy: free runs patches concurrently across hosts; reporting must run once after
+# everyone finishes, with access to all hostvars — localhost is the right place for that aggregation.
+#
+# Related files to keep mentally linked:
+#   - Roles: ansible/roles/patch, security_scan, reporting (metrics template ends up as patch_metrics.prom).
+#   - Observability: docker-compose.yml (ansible service + volume), prometheus/prometheus.yml, grafana provisioning.
+#   - CI gate: .github/workflows/ci.yml runs this playbook and checks compliance/duration in JSON output.
 # ===============================
 # Play 1: Patch All Targets
 # ===============================
@@ -14,6 +25,11 @@
     - common
     - health_check
     - patch
+    - security_scan
+  # Why security_scan runs after patch:
+  # We scan AFTER patching to measure how many CVEs the patch eliminated.
+  # Scanning before and after gives a diff — but for this implementation
+  # we scan post-patch to verify the patched state meets our security SLO.
 
 
 # ===============================

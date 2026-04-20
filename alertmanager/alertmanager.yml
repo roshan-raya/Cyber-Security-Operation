@@ -1,14 +1,66 @@
-# Alertmanager: console receiver (always works). For production add Slack/email and set api_url, SMTP_*.
+# Alertmanager — takes firing alerts from Prometheus and decides who gets notified how.
+#
+# Upstream: prometheus/prometheus.yml (alerting.alertmanagers) + prometheus/alert.rules.yml (rules).
+# Downstream: receivers below (webhook vs console). docker-compose.yml wires this file into the container.
+#
+# Routing logic (human view):
+#   critical → webhook receiver (visible at ALERTMANAGER_WEBHOOK_URL in real time)
+#   warning  → console (appears in: docker compose logs alertmanager)
+#
+# For production: replace webhook_url with Slack incoming webhook or PagerDuty endpoint.
+# Set ALERTMANAGER_WEBHOOK_URL in .env to a https://webhook.site URL for demo use.
+
 global:
   resolve_timeout: 5m
 
+templates: []
+
 route:
-  group_by: ['alertname', 'severity']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 12h
+  # Default receiver for anything not matched by a child route
   receiver: 'console'
+  group_by: ['alertname', 'severity', 'job']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 4h
+
+  routes:
+    - receiver: 'webhook-critical'
+      matchers:
+        - severity="critical"
+      group_wait: 5s
+      group_interval: 15s
+      repeat_interval: 1h
+      continue: false
+
+    - receiver: 'console'
+      matchers:
+        - severity="warning"
+      group_wait: 30s
+      repeat_interval: 4h
+      continue: false
+
+inhibit_rules:
+  # When a critical alert fires for the same alertname + host, suppress the
+  # corresponding warning alert to reduce noise during active incidents.
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['alertname']
 
 receivers:
   - name: 'console'
-    webhook_configs: []
+    # Console receiver: no config needed.
+    # Fired alerts appear in Docker logs:
+    #   docker compose logs alertmanager --follow
+
+  - name: 'webhook-critical'
+    webhook_configs:
+      - url: 'https://webhook.site/53813426-de90-4268-a2d4-eabee6ee7fa4'
+        # Why: webhook.site provides a free HTTPS endpoint that shows incoming
+        # POSTs in real time — perfect for demo purposes without any infrastructure.
+        # Set ALERTMANAGER_WEBHOOK_URL=https://webhook.site/YOUR-UUID in .env
+        send_resolved: true
+        max_alerts: 20
+        http_config:
+          follow_redirects: true

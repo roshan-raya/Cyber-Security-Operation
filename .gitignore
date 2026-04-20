@@ -5,3 +5,8 @@ ansible/reports/*.json
 ansible/reports/*.csv
 ansible/reports/*.prom
 .DS_Store
+backups/
+
+# Ansible Vault password file — NEVER commit this
+.vault-password
+ansible/vault/*.yml.bak

@@ -1,5 +1,12 @@
 ---
-# Reporting runs on localhost (play 2); uses hostvars + groups['all'] for data
+# Reporting role — “turn the patch run into artifacts humans and machines can trust.”
+#
+# Runs in play 2 of ansible/playbooks/patch_orchestrator.yml on localhost after all hosts are patched.
+# It reads per-host facts set by the patch (and security_scan) roles via hostvars, builds patch_report_list,
+# then writes JSON/CSV, checksums, audit history, and patch_metrics.prom for Prometheus.
+#
+# Downstream: ansible/metrics_exporter.py exposes patch_metrics.prom; prometheus scrapes it; Grafana
+# dashboards in grafana/provisioning/dashboards/ visualize the same series names you see in templates/.
 - name: Gather facts (for timestamp/duration)
   ansible.builtin.setup:
 
@@ -29,13 +36,38 @@
       duration_seconds: "{{ ansible_facts['date_time']['epoch'] | int - (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int) }}"
       timestamp: "{{ ansible_facts['date_time']['epoch'] }}"
       group: "{{ patch_group | default('all') }}"
-      environment: "{{ patch_environment | default('unspecified') }}"
+      # Per-host deployment slice for dashboards (blue/green inventory groups take precedence).
+      environment: >-
+        {% if 'blue' in hostvars[item].group_names %}blue{% elif 'green' in hostvars[item].group_names %}green{% else %}{{ patch_environment | default('unspecified') }}{% endif %}
+      scan_critical_count: "{{ hostvars[item].scan_critical_count | default(0) }}"
+      scan_high_count: "{{ hostvars[item].scan_high_count | default(0) }}"
+      scan_performed: "{{ hostvars[item].scan_performed | default(false) }}"
   loop: "{{ groups['all'] | default([]) }}"
   when: groups['all'] | default([]) | length > 0
 
 - name: Set patch compliance percentage
   ansible.builtin.set_fact:
     patch_compliance_percentage: "{{ ((patch_report_list | selectattr('failed', 'equalto', false) | list | length) / (patch_report_list | length) * 100.0) | round(2) if (patch_report_list | length) > 0 else 0 }}"
+
+# Run-level gauges (duration, last run, aggregate compliance, audit) use this label so Prometheus
+# does not stay on unspecified when the inventory is blue/green.
+- name: Derive aggregate environment label for run-level Prometheus metrics
+  ansible.builtin.set_fact:
+    patch_metrics_aggregate_environment: "{{ _patch_agg_env | trim }}"
+  vars:
+    _unique_envs: "{{ patch_report_list | default([]) | map(attribute='environment') | list | unique | sort }}"
+    _patch_agg_env: >-
+      {% if _unique_envs | length == 0 -%}
+      {{ patch_environment | default('unspecified') }}
+      {%- elif _unique_envs | length == 1 -%}
+      {{ _unique_envs[0] }}
+      {%- elif 'blue' in _unique_envs -%}
+      blue
+      {%- elif 'green' in _unique_envs -%}
+      green
+      {%- else -%}
+      {{ patch_environment | default('unspecified') }}
+      {%- endif %}
 
 - name: Write patch report JSON (timestamped)
   ansible.builtin.copy:
@@ -46,6 +78,74 @@
   ansible.builtin.copy:
     content: "{{ {'hosts': patch_report_list | default([]), 'duration_seconds': (ansible_facts['date_time']['epoch'] | int - (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int)), 'environment': patch_environment | default('unspecified'), 'group': patch_group | default('all'), 'compliance_percentage': patch_compliance_percentage | default(0)} | to_nice_json }}"
     dest: "/ansible/reports/patch_report_latest.json"
+
+- name: Generate SHA256 signature for patch report
+  ansible.builtin.shell: >
+    sha256sum /ansible/reports/patch_report_latest.json |
+    cut -d' ' -f1
+  register: report_checksum
+  changed_when: false
+  # Why: signed reports prove the report was not modified after the patch run.
+  # The checksum is written alongside the report so it can be verified later.
+
+- name: Write report signature file
+  ansible.builtin.copy:
+    content: |
+      # Patch report integrity signature
+      # Generated: {{ ansible_facts['date_time']['iso8601'] }}
+      # Verify with: sha256sum -c patch_report_latest.json.sha256
+      {{ report_checksum.stdout }}  patch_report_latest.json
+    dest: /ansible/reports/patch_report_latest.json.sha256
+
+- name: Check for existing patch audit state file
+  ansible.builtin.stat:
+    path: /ansible/reports/patch_audit_state.json
+  register: patch_audit_stat
+
+- name: Load patch audit state (last runs for Grafana audit table)
+  ansible.builtin.slurp:
+    path: /ansible/reports/patch_audit_state.json
+  register: patch_audit_slurp
+  when: patch_audit_stat.stat.exists | default(false)
+
+- name: Merge current run into patch audit history (retain last 10)
+  ansible.builtin.set_fact:
+    patch_audit_runs_final: "{{ (patch_audit_prior + [patch_audit_new_entry])[-10:] }}"
+  vars:
+    patch_audit_prior: >-
+      {{
+        (patch_audit_slurp.content | b64decode | from_json | default([]))
+        if (patch_audit_stat.stat.exists | default(false)) and (patch_audit_slurp is defined)
+        else []
+      }}
+    patch_audit_new_entry:
+      timestamp: "{{ ansible_facts['date_time']['epoch'] | int }}"
+      environment: "{{ patch_metrics_aggregate_environment | default(patch_environment | default('unspecified')) }}"
+      group: "{{ patch_group | default('all') }}"
+      checksum: "{{ report_checksum.stdout }}"
+
+- name: Persist patch audit state
+  ansible.builtin.copy:
+    content: "{{ patch_audit_runs_final | to_nice_json }}"
+    dest: /ansible/reports/patch_audit_state.json
+    mode: "0644"
+
+- name: Write audit trail entry
+  ansible.builtin.lineinfile:
+    path: /ansible/reports/audit_trail.log
+    line: >-
+      {{ ansible_facts['date_time']['iso8601'] }}
+      | env={{ patch_environment | default('unspecified') }}
+      | group={{ patch_group | default('all') }}
+      | compliance={{ patch_compliance_percentage | default(0) }}%
+      | duration={{ ansible_facts['date_time']['epoch'] | int -
+        (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int) }}s
+      | sha256={{ report_checksum.stdout }}
+    create: true
+    mode: "0644"
+  # Why: the audit trail log gives a single-file history of every patch run.
+  # Each line is one run with timestamp, environment, compliance, and checksum.
+  # This is what you'd show an auditor or security team.
 
 - name: Write patch_report_latest.csv
   ansible.builtin.template:

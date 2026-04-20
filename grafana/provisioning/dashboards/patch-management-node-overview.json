@@ -1,0 +1,489 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Target Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "color": "red", "index": 1, "text": "DOWN" }, "1": { "color": "green", "index": 0, "text": "UP" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      },
+      "title": "Targets Up",
+      "type": "stat",
+      "targets": [
+        { "expr": "up", "legendFormat": "{{job}} — {{instance}}", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "Patch Status",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 6 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "text": {},
+        "textMode": "auto"
+      },
+      "title": "Patch Success Rate %",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "100 * sum(patch_host_success == 1) / count(patch_host_success)",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 6 },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "text": {},
+        "textMode": "auto"
+      },
+      "title": "Patch Compliance %",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "100 * sum(patch_host_success == 1) / count(patch_host_success)",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3600 },
+              { "color": "red", "value": 7200 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 6 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "text": {},
+        "textMode": "auto"
+      },
+      "title": "Patch Run Duration",
+      "type": "stat",
+      "targets": [
+        { "expr": "patch_run_duration_seconds", "legendFormat": "", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 6 },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "text": {},
+        "textMode": "auto"
+      },
+      "title": "Failed Hosts Count",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(patch_host_success == 0) or vector(0)",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 102,
+      "title": "Blue / Green Deployment Success",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "blue", "value": 95 }
+            ]
+          },
+          "unit": "percent",
+          "noValue": "No env label — see docs"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 12 },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "text": {},
+        "textMode": "auto"
+      },
+      "title": "Blue Success %",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "100 * sum(patch_host_success{environment=\"blue\"} == 1) / count(patch_host_success{environment=\"blue\"})",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          },
+          "unit": "percent",
+          "noValue": "No env label — see docs"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 12 },
+      "id": 7,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "text": {},
+        "textMode": "auto"
+      },
+      "title": "Green Success %",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "100 * sum(patch_host_success{environment=\"green\"} == 1) / count(patch_host_success{environment=\"green\"})",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "text", "value": null }
+            ]
+          },
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 12 },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "text": {},
+        "textMode": "auto"
+      },
+      "title": "Last Patch Timestamp",
+      "type": "stat",
+      "targets": [
+        { "expr": "patch_last_success_timestamp_seconds * 1000", "legendFormat": "", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 103,
+      "title": "Resource Monitoring",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "id": 9,
+      "options": {
+        "legend": { "calcs": ["last", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "title": "CPU Usage %",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["last", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "title": "Memory Usage %",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 104,
+      "title": "Per-Host Patch Log",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "color-background" },
+            "filterable": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "options": { "0": { "text": "FAILED" }, "1": { "text": "SUCCESS" } }, "type": "value" }
+          ]
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Time" }, "properties": [{ "id": "custom.width", "value": 180 }] },
+          { "matcher": { "id": "byName", "options": "host" }, "properties": [{ "id": "custom.width", "value": 160 }] },
+          { "matcher": { "id": "byName", "options": "environment" }, "properties": [{ "id": "custom.width", "value": 120 }] },
+          { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "Status" }, { "id": "custom.width", "value": 100 }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+      "id": 11,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Time" }]
+      },
+      "title": "Per-Host Patch Success",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "patch_host_success",
+          "instant": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        { "id": "labelsToFields", "options": { "mode": "columns" } },
+        { "id": "organize", "options": { "excludeByName": { "__name__": true, "job": false, "instance": false }, "renameByName": {} } }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "tags": ["patch-management", "catnip-games", "ansible"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(patch_host_success, environment)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Environment",
+        "multi": false,
+        "name": "environment",
+        "options": [],
+        "query": { "query": "label_values(patch_host_success, environment)", "refId": "A" },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Patch Management · Node Overview",
+  "uid": "catnip-patch-mgmt",
+  "version": 1
+}

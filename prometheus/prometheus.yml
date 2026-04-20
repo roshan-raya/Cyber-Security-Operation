@@ -1,3 +1,10 @@
+# Prometheus: collects metrics, evaluates alert.rules.yml, forwards firing alerts to Alertmanager.
+#
+# How this file fits the patch story:
+#   - Job "patch_metrics" scrapes the ansible container (see docker-compose.yml expose 9101).
+#     That HTTP endpoint is ansible/metrics_exporter.py serving Ansible-written patch_metrics.prom.
+#   - Job "node-exporter" feeds the node dashboards; labels here should match what Grafana queries expect.
+#   - Alert definitions live in alert.rules.yml; routing/notifications live in alertmanager/alertmanager.yml.
 global:
   scrape_interval: 5m
   evaluation_interval: 5m
@@ -57,6 +64,6 @@ scrape_configs:
     scrape_interval: 15s
     static_configs:
       - targets:
-          - host.docker.internal:9104
+          - log-generator:9104
         labels:
           role: log-generator

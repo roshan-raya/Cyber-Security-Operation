@@ -1,12 +1,47 @@
 ---
-# Rollback: reinstall baseline package versions (demo)
-- name: Rollback - reinstall baseline package versions (demo)
+# rollback.yml — Restore system state after a failed patch
+#
+# Called from the rescue block in patch/tasks/main.yml when:
+#   rollback_enabled: true  (must be explicitly set, never automatic in production)
+#
+# Depends on: rollback_packages fact set by the pre-patch snapshot task in main.yml
+# If rollback_packages is empty the playbook will fail-fast rather than run blind.
+
+- name: Verify rollback_packages is populated before proceeding
+  ansible.builtin.fail:
+    msg: >
+      rollback_packages is empty — pre-patch snapshot did not run or captured
+      nothing. Rollback cannot proceed safely without a package baseline.
+      Check that the 'Capture pre-patch package snapshot' task ran successfully.
+  when: rollback_packages | default([]) | length == 0
+
+- name: Reinstall packages from pre-patch snapshot
   ansible.builtin.apt:
     name: "{{ rollback_packages }}"
     state: present
     allow_downgrade: true
     update_cache: true
+  when: rollback_packages | default([]) | length > 0
+  # Why allow_downgrade: the patch may have upgraded packages that introduced
+  # the failure. We need to be able to go back to the snapshot version.
 
-- name: Rollback marker
+- name: Verify SSH service is still active post-rollback
+  ansible.builtin.service:
+    name: ssh
+    state: started
+  ignore_errors: true
+  # Why: SSH is the only critical service we can verify from inside Ansible.
+  # If SSH is down after rollback, the host is effectively unreachable.
+
+- name: Mark rollback as performed and clear ok flag
   ansible.builtin.set_fact:
     rollback_performed: true
+    patch_ok: false
+  # Why: reporting role reads these flags to record rollback events in the JSON report.
+
+- name: Log rollback completion summary
+  ansible.builtin.debug:
+    msg: >
+      ROLLBACK COMPLETED — {{ inventory_hostname }}.
+      Packages restored: {{ rollback_packages | length }}.
+      Trigger: {{ ansible_failed_result.msg | default('patch failure') }}

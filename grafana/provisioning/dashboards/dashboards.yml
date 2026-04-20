@@ -1,12 +1,19 @@
+# Grafana reads this file on startup. It only says “load every dashboard JSON from this folder.”
+#
+# Related pieces in this repo:
+#   - Dashboard JSON next to this file (e.g. patch-slo.json, node-overview.json) — those panels
+#     query Prometheus; metric names come from ansible/reports (patch_metrics.prom) via the exporter.
+#   - docker-compose.yml mounts ./grafana/provisioning → /etc/grafana/provisioning inside Grafana.
+#   - Prometheus scrape config: prometheus/prometheus.yml (job patch_metrics → ansible:9101).
 apiVersion: 1
 providers:
-  - name: default
+  - name: 'default'
     orgId: 1
     folder: ''
-    folderUid: ''
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
-    allowUiUpdates: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: false
     options:
       path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

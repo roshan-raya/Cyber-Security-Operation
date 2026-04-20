@@ -1,0 +1,443 @@
+
+PLAY [Patch all hosts] *********************************************************
+[WARNING]: Using run_once with the free strategy is not currently supported.
+This task will still be executed for every host in the inventory list.
+
+TASK [Gathering Facts] *********************************************************
+ok: [patch-target-1]
+ok: [patch-target-3]
+ok: [patch-target-4]
+ok: [patch-target-2]
+ok: [patch-target-5]
+
+TASK [common : Record start time] **********************************************
+ok: [patch-target-1]
+ok: [patch-target-3]
+ok: [patch-target-2]
+ok: [patch-target-4]
+ok: [patch-target-5]
+
+TASK [common : Set patch failed flag (default)] ********************************
+ok: [patch-target-1]
+ok: [patch-target-2]
+ok: [patch-target-3]
+ok: [patch-target-4]
+ok: [patch-target-5]
+
+TASK [health_check : Gather facts] *********************************************
+ok: [patch-target-2]
+ok: [patch-target-3]
+ok: [patch-target-5]
+ok: [patch-target-1]
+ok: [patch-target-4]
+
+TASK [health_check : Ping (connection check)] **********************************
+ok: [patch-target-5]
+ok: [patch-target-4]
+ok: [patch-target-1]
+ok: [patch-target-3]
+ok: [patch-target-2]
+
+TASK [health_check : Check system uptime] **************************************
+ok: [patch-target-2]
+ok: [patch-target-1]
+ok: [patch-target-3]
+ok: [patch-target-5]
+ok: [patch-target-4]
+
+TASK [health_check : Display uptime] *******************************************
+ok: [patch-target-2] => {
+    "uptime_out.stdout": " 20:57:27 up  2:34,  0 users,  load average: 1.25, 1.49, 1.34"
+}
+ok: [patch-target-1] => {
+    "uptime_out.stdout": " 20:57:27 up  2:34,  0 users,  load average: 1.25, 1.49, 1.34"
+}
+ok: [patch-target-3] => {
+    "uptime_out.stdout": " 20:57:27 up  2:34,  0 users,  load average: 1.25, 1.49, 1.34"
+}
+ok: [patch-target-5] => {
+    "uptime_out.stdout": " 20:57:27 up  2:34,  0 users,  load average: 1.25, 1.49, 1.34"
+}
+ok: [patch-target-4] => {
+    "uptime_out.stdout": " 20:57:27 up  2:34,  0 users,  load average: 1.25, 1.49, 1.34"
+}
+
+TASK [health_check : Ensure SSH service is active (try ssh)] *******************
+ok: [patch-target-2]
+ok: [patch-target-3]
+ok: [patch-target-4]
+ok: [patch-target-5]
+
+TASK [health_check : Ensure SSH service is active (try sshd)] ******************
+skipping: [patch-target-2]
+
+TASK [health_check : Ensure SSH service is active (try ssh)] *******************
+ok: [patch-target-1]
+
+TASK [health_check : Ensure SSH service is active (try sshd)] ******************
+skipping: [patch-target-3]
+skipping: [patch-target-4]
+skipping: [patch-target-1]
+
+TASK [health_check : Health check summary] *************************************
+ok: [patch-target-2] => {
+    "msg": "patch-target-2: SSH OK, uptime OK, ssh service active"
+}
+
+TASK [health_check : Ensure SSH service is active (try sshd)] ******************
+skipping: [patch-target-5]
+
+TASK [health_check : Health check summary] *************************************
+ok: [patch-target-1] => {
+    "msg": "patch-target-1: SSH OK, uptime OK, ssh service active"
+}
+ok: [patch-target-3] => {
+    "msg": "patch-target-3: SSH OK, uptime OK, ssh service active"
+}
+ok: [patch-target-4] => {
+    "msg": "patch-target-4: SSH OK, uptime OK, ssh service active"
+}
+ok: [patch-target-5] => {
+    "msg": "patch-target-5: SSH OK, uptime OK, ssh service active"
+}
+
+TASK [patch : Capture pre-patch package snapshot for rollback] *****************
+ok: [patch-target-1]
+ok: [patch-target-2]
+ok: [patch-target-4]
+ok: [patch-target-3]
+
+TASK [patch : Store rollback package list from pre-patch snapshot] *************
+ok: [patch-target-1]
+ok: [patch-target-2]
+ok: [patch-target-3]
+ok: [patch-target-4]
+
+TASK [patch : Capture pre-patch package snapshot for rollback] *****************
+ok: [patch-target-5]
+
+TASK [patch : Store rollback package list from pre-patch snapshot] *************
+ok: [patch-target-5]
+
+TASK [patch : Gather facts] ****************************************************
+ok: [patch-target-1]
+ok: [patch-target-4]
+ok: [patch-target-2]
+ok: [patch-target-3]
+ok: [patch-target-5]
+
+TASK [patch : Update apt cache] ************************************************
+ok: [patch-target-2]
+
+TASK [patch : FAILURE SIMULATION (optional) - force this host to fail] *********
+skipping: [patch-target-2]
+
+TASK [patch : Update apt cache] ************************************************
+ok: [patch-target-1]
+ok: [patch-target-4]
+
+TASK [patch : FAILURE SIMULATION (optional) - force this host to fail] *********
+fatal: [patch-target-1]: FAILED! => {"changed": false, "msg": "Simulated patch failure for demo (fail_host=patch-target-1)"}
+skipping: [patch-target-4]
+
+TASK [patch : Mark patch failed] ***********************************************
+ok: [patch-target-1]
+
+TASK [patch : Update apt cache] ************************************************
+ok: [patch-target-5]
+
+TASK [patch : Run rollback (only if enabled)] **********************************
+included: /ansible/roles/patch/tasks/rollback.yml for patch-target-1
+
+TASK [patch : FAILURE SIMULATION (optional) - force this host to fail] *********
+skipping: [patch-target-5]
+
+TASK [patch : Verify rollback_packages is populated before proceeding] *********
+skipping: [patch-target-1]
+
+TASK [patch : Update apt cache] ************************************************
+ok: [patch-target-3]
+
+TASK [patch : FAILURE SIMULATION (optional) - force this host to fail] *********
+skipping: [patch-target-3]
+
+TASK [patch : Upgrade packages (security and safe updates)] ********************
+ok: [patch-target-2]
+ok: [patch-target-4]
+
+TASK [patch : Set patch changed flag] ******************************************
+ok: [patch-target-2]
+ok: [patch-target-4]
+
+TASK [patch : Upgrade packages (security and safe updates)] ********************
+ok: [patch-target-5]
+
+TASK [patch : Set patch changed flag] ******************************************
+ok: [patch-target-5]
+
+TASK [patch : Upgrade packages (security and safe updates)] ********************
+ok: [patch-target-3]
+
+TASK [patch : Set patch changed flag] ******************************************
+ok: [patch-target-3]
+
+TASK [patch : Check if reboot required] ****************************************
+ok: [patch-target-2]
+ok: [patch-target-4]
+
+TASK [patch : Reboot if required] **********************************************
+skipping: [patch-target-2]
+skipping: [patch-target-4]
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-2]
+
+TASK [patch : Reinstall packages from pre-patch snapshot] **********************
+ok: [patch-target-1]
+
+TASK [patch : Check if reboot required] ****************************************
+ok: [patch-target-5]
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-4]
+
+TASK [patch : Wait for connection after reboot] ********************************
+skipping: [patch-target-2]
+skipping: [patch-target-4]
+
+TASK [patch : Reboot if required] **********************************************
+skipping: [patch-target-5]
+
+TASK [patch : Re-gather facts after reboot] ************************************
+skipping: [patch-target-2]
+skipping: [patch-target-4]
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-5]
+
+TASK [patch : Validate system health (uptime >= 0)] ****************************
+ok: [patch-target-2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [patch-target-4] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [patch : Wait for connection after reboot] ********************************
+skipping: [patch-target-5]
+
+TASK [patch : Re-gather facts after reboot] ************************************
+skipping: [patch-target-5]
+
+TASK [patch : Validate system health (uptime >= 0)] ****************************
+ok: [patch-target-5] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [patch : Check if reboot required] ****************************************
+ok: [patch-target-3]
+
+TASK [patch : Reboot if required] **********************************************
+skipping: [patch-target-3]
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-3]
+
+TASK [patch : Wait for connection after reboot] ********************************
+skipping: [patch-target-3]
+
+TASK [patch : Re-gather facts after reboot] ************************************
+skipping: [patch-target-3]
+
+TASK [patch : Validate system health (uptime >= 0)] ****************************
+ok: [patch-target-3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [patch : Verify SSH service is still active post-rollback] ****************
+ok: [patch-target-1]
+
+TASK [patch : Mark rollback as performed and clear ok flag] ********************
+ok: [patch-target-1]
+
+TASK [patch : Log rollback completion summary] *********************************
+ok: [patch-target-1] => {
+    "msg": "ROLLBACK COMPLETED — patch-target-1. Packages restored: 140. Trigger: Simulated patch failure for demo (fail_host=patch-target-1)\n"
+}
+
+TASK [security_scan : Ensure scan output directory exists] *********************
+ok: [patch-target-5]
+ok: [patch-target-2]
+ok: [patch-target-4]
+ok: [patch-target-3]
+ok: [patch-target-1]
+
+TASK [security_scan : Check if Trivy is already installed] *********************
+ok: [patch-target-4]
+ok: [patch-target-2]
+ok: [patch-target-5]
+ok: [patch-target-3]
+ok: [patch-target-1]
+
+TASK [security_scan : Download Trivy binary] ***********************************
+ok: [patch-target-3]
+ok: [patch-target-2]
+ok: [patch-target-5]
+ok: [patch-target-4]
+
+TASK [security_scan : Extract Trivy binary] ************************************
+skipping: [patch-target-2]
+skipping: [patch-target-3]
+skipping: [patch-target-4]
+skipping: [patch-target-5]
+
+TASK [security_scan : Download Trivy binary] ***********************************
+ok: [patch-target-1]
+
+TASK [security_scan : Extract Trivy binary] ************************************
+skipping: [patch-target-1]
+
+TASK [security_scan : Run Trivy OS package scan] *******************************
+ok: [patch-target-3]
+ok: [patch-target-2]
+ok: [patch-target-5]
+ok: [patch-target-4]
+ok: [patch-target-1]
+
+TASK [security_scan : Read scan results] ***************************************
+ok: [patch-target-4]
+
+TASK [security_scan : Parse CVE counts from scan results] **********************
+skipping: [patch-target-4]
+
+TASK [security_scan : Set scan defaults if scan was skipped or failed] *********
+ok: [patch-target-4]
+
+TASK [security_scan : Read scan results] ***************************************
+ok: [patch-target-3]
+ok: [patch-target-2]
+
+TASK [security_scan : Log scan summary] ****************************************
+ok: [patch-target-4] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-4. Critical CVEs: 0. High CVEs: 0.\n"
+}
+
+TASK [security_scan : Read scan results] ***************************************
+ok: [patch-target-5]
+
+TASK [security_scan : Parse CVE counts from scan results] **********************
+skipping: [patch-target-3]
+skipping: [patch-target-2]
+
+TASK [security_scan : Set scan defaults if scan was skipped or failed] *********
+ok: [patch-target-3]
+
+TASK [security_scan : Fail if critical CVEs found and scan_fail_on_critical is true] ***
+skipping: [patch-target-4]
+
+TASK [security_scan : Parse CVE counts from scan results] **********************
+skipping: [patch-target-5]
+
+TASK [security_scan : Set scan defaults if scan was skipped or failed] *********
+ok: [patch-target-2]
+
+TASK [security_scan : Log scan summary] ****************************************
+ok: [patch-target-3] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-3. Critical CVEs: 0. High CVEs: 0.\n"
+}
+
+TASK [security_scan : Set scan defaults if scan was skipped or failed] *********
+ok: [patch-target-5]
+
+TASK [security_scan : Log scan summary] ****************************************
+ok: [patch-target-2] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-2. Critical CVEs: 0. High CVEs: 0.\n"
+}
+
+TASK [security_scan : Fail if critical CVEs found and scan_fail_on_critical is true] ***
+skipping: [patch-target-3]
+
+TASK [security_scan : Log scan summary] ****************************************
+ok: [patch-target-5] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-5. Critical CVEs: 0. High CVEs: 0.\n"
+}
+
+TASK [security_scan : Fail if critical CVEs found and scan_fail_on_critical is true] ***
+skipping: [patch-target-2]
+skipping: [patch-target-5]
+
+TASK [security_scan : Read scan results] ***************************************
+ok: [patch-target-1]
+
+TASK [security_scan : Parse CVE counts from scan results] **********************
+skipping: [patch-target-1]
+
+TASK [security_scan : Set scan defaults if scan was skipped or failed] *********
+ok: [patch-target-1]
+
+TASK [security_scan : Log scan summary] ****************************************
+ok: [patch-target-1] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-1. Critical CVEs: 0. High CVEs: 0.\n"
+}
+
+TASK [security_scan : Fail if critical CVEs found and scan_fail_on_critical is true] ***
+skipping: [patch-target-1]
+
+PLAY [Generate patch reports] **************************************************
+
+TASK [reporting : Gather facts (for timestamp/duration)] ***********************
+ok: [localhost]
+
+TASK [reporting : Ensure reports directory exists] *****************************
+ok: [localhost]
+
+TASK [reporting : Get patch start epoch for reporting (from first host in inventory)] ***
+ok: [localhost]
+
+TASK [reporting : Build report list per host] **********************************
+ok: [localhost] => (item=patch-target-1)
+ok: [localhost] => (item=patch-target-2)
+ok: [localhost] => (item=patch-target-3)
+ok: [localhost] => (item=patch-target-4)
+ok: [localhost] => (item=patch-target-5)
+
+TASK [reporting : Set patch compliance percentage] *****************************
+ok: [localhost]
+
+TASK [reporting : Write patch report JSON (timestamped)] ***********************
+changed: [localhost]
+
+TASK [reporting : Write patch_report_latest.json] ******************************
+changed: [localhost]
+
+TASK [reporting : Generate SHA256 signature for patch report] ******************
+ok: [localhost]
+
+TASK [reporting : Write report signature file] *********************************
+changed: [localhost]
+
+TASK [reporting : Write audit trail entry] *************************************
+changed: [localhost]
+
+TASK [reporting : Write patch_report_latest.csv] *******************************
+changed: [localhost]
+
+TASK [reporting : Generate Prometheus patch metrics file] **********************
+changed: [localhost]
+
+TASK [reporting : Structured summary] ******************************************
+ok: [localhost] => {
+    "msg": "Patch run complete. Report: /ansible/reports/patch_report_latest.json (env=unspecified, group=all)"
+}
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=13   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+patch-target-1             : ok=26   changed=0    unreachable=0    failed=0    skipped=5    rescued=1    ignored=0   
+patch-target-2             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+patch-target-3             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+patch-target-4             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+patch-target-5             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   

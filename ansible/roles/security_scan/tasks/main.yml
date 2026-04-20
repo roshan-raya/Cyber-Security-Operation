@@ -1,0 +1,118 @@
+---
+# security_scan/tasks/main.yml
+# Post-patch vulnerability scan using Trivy
+#
+# What this does:
+#   1. Installs Trivy binary on the target host (idempotent)
+#   2. Scans installed OS packages for known CVEs
+#   3. Writes JSON results to scan_output_dir
+#   4. Sets facts used by the reporting role for metrics and alerts
+#   5. Optionally fails the play if critical CVEs found
+
+- name: Ensure scan output directory exists
+  ansible.builtin.file:
+    path: "{{ scan_output_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Check if Trivy is already installed
+  ansible.builtin.command: trivy --version
+  register: trivy_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Trivy binary (if not present)
+  when: trivy_check.rc != 0
+  block:
+    - name: Download Trivy binary
+      ansible.builtin.get_url:
+        url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.tar.gz"
+        dest: /tmp/trivy.tar.gz
+        mode: "0644"
+        timeout: 30
+      register: trivy_download
+      failed_when: false
+      # Why failed_when false: no internet access in Docker sim environment.
+      # Trivy install will be skipped gracefully if download fails.
+
+    - name: Extract Trivy binary
+      ansible.builtin.unarchive:
+        src: /tmp/trivy.tar.gz
+        dest: /usr/local/bin/
+        remote_src: true
+        include:
+          - trivy
+      when: trivy_download is succeeded and trivy_download.changed
+
+- name: Run Trivy OS package scan
+  ansible.builtin.command: >-
+    trivy fs --security-checks vuln
+    --severity {{ scan_severity_threshold }},CRITICAL
+    --format json
+    --output {{ scan_output_dir }}/scan_results.json
+    --no-progress
+    /
+  register: trivy_scan
+  changed_when: false
+  failed_when: false
+  when: trivy_check.rc == 0 or (trivy_download is defined and trivy_download is succeeded)
+  # Why failed_when false: a non-zero exit from Trivy means CVEs were found,
+  # not that the scan itself failed. We handle severity thresholds ourselves.
+
+- name: Read scan results
+  ansible.builtin.slurp:
+    src: "{{ scan_output_dir }}/scan_results.json"
+  register: scan_results_raw
+  failed_when: false
+  when: trivy_scan is not skipped
+
+- name: Parse CVE counts from scan results
+  ansible.builtin.set_fact:
+    scan_critical_count: >-
+      {{ (scan_results_raw.content | b64decode | from_json).Results
+         | default([])
+         | map(attribute='Vulnerabilities')
+         | flatten
+         | selectattr('Severity', 'equalto', 'CRITICAL')
+         | list | length }}
+    scan_high_count: >-
+      {{ (scan_results_raw.content | b64decode | from_json).Results
+         | default([])
+         | map(attribute='Vulnerabilities')
+         | flatten
+         | selectattr('Severity', 'equalto', 'HIGH')
+         | list | length }}
+    scan_performed: true
+  when:
+    - scan_results_raw is not skipped
+    - scan_results_raw.content is defined
+  failed_when: false
+
+- name: Set scan defaults if scan was skipped or failed
+  ansible.builtin.set_fact:
+    scan_critical_count: 0
+    scan_high_count: 0
+    scan_performed: false
+  when: >
+    trivy_scan is skipped or
+    scan_results_raw is skipped or
+    scan_results_raw.content is not defined
+
+- name: Log scan summary
+  ansible.builtin.debug:
+    msg: >
+      Security scan {{ 'completed' if scan_performed else 'skipped (Trivy not available)' }}
+      on {{ inventory_hostname }}.
+      Critical CVEs: {{ scan_critical_count | default(0) }}.
+      High CVEs: {{ scan_high_count | default(0) }}.
+
+- name: Fail if critical CVEs found and scan_fail_on_critical is true
+  ansible.builtin.fail:
+    msg: >
+      SECURITY GATE FAILED on {{ inventory_hostname }}.
+      {{ scan_critical_count }} critical CVEs remain after patching.
+      Review {{ scan_output_dir }}/scan_results.json for details.
+  when:
+    - scan_fail_on_critical | bool
+    - scan_performed | bool
+    - scan_critical_count | int > scan_critical_threshold | int

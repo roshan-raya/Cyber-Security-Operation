@@ -1,6 +1,18 @@
+# -----------------------------------------------------------------------------
+# Human note: this file is Prometheus “exposition format” (text metrics), not a shell script.
+# Ansible fills it from patch_report_list after a run (see roles/reporting/tasks/main.yml).
+#
+# Data path (so you know where to look):
+#   patch_orchestrator.yml → patch + security_scan roles set host facts
+#   → reporting role builds patch_report_list → this template → /ansible/reports/patch_metrics.prom
+#   → ansible/metrics_exporter.py serves :9101/metrics
+#   → prometheus/prometheus.yml job "patch_metrics" scrapes ansible:9101
+#   → grafana/provisioning/dashboards/patch-*.json charts + prometheus/alert.rules.yml alerts
+# -----------------------------------------------------------------------------
+
 # HELP patch_run_duration_seconds Duration of last patch run
 # TYPE patch_run_duration_seconds gauge
-patch_run_duration_seconds{environment="{{ patch_environment | default('unspecified') }}",group="{{ patch_group | default('all') }}"} {{ ansible_facts['date_time']['epoch'] | int - (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int) }}
+patch_run_duration_seconds{environment="{{ patch_metrics_aggregate_environment | default(patch_environment | default('unspecified')) }}",group="{{ patch_group | default('all') }}"} {{ ansible_facts['date_time']['epoch'] | int - (patch_start_epoch | default(ansible_facts['date_time']['epoch']) | int) }}
 
 # HELP patch_host_success Patch success per host (1=success, 0=failure)
 # TYPE patch_host_success gauge
@@ -16,8 +28,29 @@ patch_host_changed{host="{{ h.host }}",environment="{{ h.environment }}",group="
 
 # HELP patch_last_run_timestamp Unix timestamp of last patch
 # TYPE patch_last_run_timestamp gauge
-patch_last_run_timestamp{environment="{{ patch_environment | default('unspecified') }}",group="{{ patch_group | default('all') }}"} {{ ansible_facts['date_time']['epoch'] }}
+patch_last_run_timestamp{environment="{{ patch_metrics_aggregate_environment | default(patch_environment | default('unspecified')) }}",group="{{ patch_group | default('all') }}"} {{ ansible_facts['date_time']['epoch'] }}
+
+# HELP patch_last_success_timestamp_seconds Unix timestamp of last patch run with at least one successful host (0 if none)
+# TYPE patch_last_success_timestamp_seconds gauge
+patch_last_success_timestamp_seconds{environment="{{ patch_metrics_aggregate_environment | default(patch_environment | default('unspecified')) }}",group="{{ patch_group | default('all') }}"} {{ ansible_facts['date_time']['epoch'] if ((patch_report_list | default([]) | selectattr('failed', 'equalto', false) | list | length) > 0) else 0 }}
 
 # HELP patch_compliance_percentage Patch compliance (success rate) percentage
 # TYPE patch_compliance_percentage gauge
-patch_compliance_percentage{environment="{{ patch_environment | default('unspecified') }}",group="{{ patch_group | default('all') }}"} {{ patch_compliance_percentage | default(0) }}
+patch_compliance_percentage{environment="{{ patch_metrics_aggregate_environment | default(patch_environment | default('unspecified')) }}",group="{{ patch_group | default('all') }}"} {{ '%.2f' | format((patch_compliance_percentage | default(0)) | float) }}
+{% for slice in ['blue', 'green'] %}
+{% set hosts_slice = patch_report_list | default([]) | selectattr('environment', 'equalto', slice) | list %}
+{% set slice_pct = ((hosts_slice | selectattr('failed', 'equalto', false) | list | length) / (hosts_slice | length) * 100.0) | round(2) if (hosts_slice | length) > 0 else 0 %}
+patch_compliance_percentage{environment="{{ slice }}",group="{{ patch_group | default('all') }}"} {{ '%.2f' | format(slice_pct | float) }}
+{% endfor %}
+
+# patch_run_audit_timestamp is appended by metrics_exporter.py from patch_audit_state.json
+
+# Security scan metrics
+# patch_scan_critical_cves: number of critical CVEs found post-patch per host
+# patch_scan_high_cves: number of high CVEs found post-patch per host
+# patch_scan_performed: 1 if scan ran, 0 if Trivy was unavailable
+{% for item in patch_report_list | default([]) %}
+patch_scan_critical_cves{host="{{ item.host }}",environment="{{ item.environment | default('unspecified') }}"} {{ item.scan_critical_count | default(0) }}
+patch_scan_high_cves{host="{{ item.host }}",environment="{{ item.environment | default('unspecified') }}"} {{ item.scan_high_count | default(0) }}
+patch_scan_performed{host="{{ item.host }}",environment="{{ item.environment | default('unspecified') }}"} {{ 1 if item.scan_performed | default(false) else 0 }}
+{% endfor %}
