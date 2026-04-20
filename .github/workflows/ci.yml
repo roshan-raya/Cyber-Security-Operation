@@ -26,6 +26,9 @@ jobs:
           sudo apt-get install -y make jq
 
       - name: Ansible lint check
+        env:
+          ANSIBLE_CONFIG: ansible/ansible.cfg
+          ANSIBLE_ROLES_PATH: ansible/roles
         run: ansible-lint ansible/
 
       - name: Build sim profile Docker images
