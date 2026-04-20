@@ -78,9 +78,3 @@ Node-exporter metrics in this repository are **container-scoped** (two simulated
 - **Patch targets:** Root SSH login is disabled (`PermitRootLogin no`); `StrictModes yes` is set. Ansible runs as non-root and uses `ansible_become: true` (sudo) for privileged tasks only.
 
 ---
-
-## 9. Formal security review (weeks 9–10)
-
-For coursework or release gates, complete the repeatable checklist and sign-off in **[docs/security-review-checklist.md](docs/security-review-checklist.md)**. It covers secrets, containers, network exposure, Trivy post-patch scanning, recovery, and monitoring SLAs—without replacing a third-party audit.
-
-**Automation:** The GitHub Actions workflow **Extended validation** (`.github/workflows/extended-validation.yml`) runs `make benchmark` and `make chaos-test` on a weekly schedule and on manual dispatch; artifacts include `docs/evidence/` outputs.
