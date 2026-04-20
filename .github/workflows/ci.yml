@@ -34,6 +34,7 @@ jobs:
         env:
           ANSIBLE_CONFIG: ansible/ansible.cfg
           ANSIBLE_ROLES_PATH: ansible/roles
+          ANSIBLE_LOG_PATH: /tmp/patch.log
         run: ansible-lint ansible/
 
       - name: Build sim profile Docker images
