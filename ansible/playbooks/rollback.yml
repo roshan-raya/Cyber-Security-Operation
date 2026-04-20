@@ -5,6 +5,25 @@
   strategy: free
   gather_facts: false
   tasks:
+    - name: Capture package snapshot when rollback_packages is missing
+      ansible.builtin.shell: >
+        dpkg-query -W -f='${Package}=${Version}\n' 2>/dev/null | sort
+      register: rollback_snapshot
+      changed_when: false
+      failed_when: false
+      when: rollback_packages | default([]) | length == 0
+
+    - name: Build rollback package list from snapshot fallback
+      ansible.builtin.set_fact:
+        rollback_packages: >-
+          {{ rollback_snapshot.stdout_lines
+             | map('regex_replace', '=.*$', '')
+             | list }}
+      when:
+        - rollback_packages | default([]) | length == 0
+        - rollback_snapshot.stdout_lines is defined
+        - rollback_snapshot.stdout_lines | length > 0
+
     - name: Apply rollback tasks from patch role
       ansible.builtin.import_role:
         name: patch
