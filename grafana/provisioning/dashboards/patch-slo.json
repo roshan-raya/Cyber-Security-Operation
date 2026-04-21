@@ -319,7 +319,7 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
       "id": 8,
       "panels": [],
-      "title": "Simulated platform traffic (synthetic metrics — demo visuals only)",
+      "title": "Simulated platform traffic (synthetic metrics)",
       "type": "row"
     },
     {
