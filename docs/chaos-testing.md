@@ -80,6 +80,9 @@ make patch ENV=hosts LIMIT=patch-target-1
 ## Running chaos tests
 
 ```bash
+# Optional: enable webhook notifications (Slack-compatible payload)
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+
 # All scenarios
 make chaos-test
 
@@ -90,6 +93,7 @@ make chaos-test-3
 ```
 
 Evidence is saved to `docs/evidence/chaos/` after each run.
+If a webhook URL is set, the script posts Scenario 3 rollback status and a final run summary.
 
 ## Evidence files
 
