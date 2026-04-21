@@ -21,6 +21,7 @@ EVIDENCE_DIR="docs/evidence/chaos"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 PASS=0
 FAIL=0
+WEBHOOK_URL="${SLACK_WEBHOOK_URL:-${WEBHOOK_URL:-}}"
 
 mkdir -p "${EVIDENCE_DIR}"
 
@@ -60,6 +61,23 @@ save_evidence() {
   local FILE="${EVIDENCE_DIR}/${TIMESTAMP}_${SCENARIO_NAME}.txt"
   echo "${CONTENT}" > "${FILE}"
   log "Evidence saved: ${FILE}"
+}
+
+notify_webhook() {
+  local MESSAGE="${1}"
+  if [ -z "${WEBHOOK_URL}" ]; then
+    log "Webhook URL not configured; skipping notification."
+    return 0
+  fi
+
+  # Escape message content to keep JSON payload valid.
+  local ESCAPED
+  ESCAPED=$(printf "%s" "${MESSAGE}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])')
+  curl -sfS -X POST -H "Content-type: application/json" \
+    --data "{\"text\":\"${ESCAPED}\"}" \
+    "${WEBHOOK_URL}" > /dev/null \
+    && log "Webhook notification sent." \
+    || log "Webhook notification failed (non-fatal)."
 }
 
 # ── Scenario 1: Target node failure mid-patch ─────────────────────────────
@@ -246,8 +264,10 @@ scenario3() {
   log "Step 3: Verify rollback executed..."
   if echo "${ROLLBACK_OUTPUT}" | grep -q "ROLLBACK COMPLETED\|rollback"; then
     pass "Rollback executed after failure"
+    notify_webhook "Chaos Scenario 3: rollback executed after simulated failure on patch-target-1 (${TIMESTAMP})."
   else
     fail "Rollback did not execute"
+    notify_webhook "Chaos Scenario 3: rollback did NOT execute after simulated failure on patch-target-1 (${TIMESTAMP})."
   fi
 
   log "Step 4: Verify rollback_performed in report..."
@@ -324,6 +344,7 @@ echo ""
 SUMMARY="Chaos test ${TIMESTAMP}: PASS=${PASS} FAIL=${FAIL} Scenario=${SCENARIO}"
 echo "${SUMMARY}" >> "${EVIDENCE_DIR}/chaos_summary.log"
 echo "  Summary logged to ${EVIDENCE_DIR}/chaos_summary.log"
+notify_webhook "${SUMMARY}"
 
 if [ "${FAIL}" -gt 0 ]; then
   echo ""
