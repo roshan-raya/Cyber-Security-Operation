@@ -217,15 +217,38 @@ for t in targets:
   fi
 
   log "Step 6: Restart metrics exporter..."
-  # Why: detached one-shot exec is unreliable here; background inside shell matches entrypoint.
-  docker compose exec -T ansible \
-    sh -c 'nohup python3 /ansible/metrics_exporter.py >/tmp/metrics_exporter.log 2>&1 &' || true
-  sleep 10
+  # Why: `exec sh -c 'nohup ... &'` often kills the child when the shell exits. `exec -d` usually
+  # fixes that but some runners still drop the process; fall back to full service restart (same
+  # entrypoint as cold start: metrics_exporter.py on :9101).
+  docker compose exec -d ansible python3 /ansible/metrics_exporter.py 2>/dev/null || true
+  sleep 2
 
   log "Step 7: Verify metrics restored..."
-  METRICS_AFTER=$(docker compose exec -T ansible \
-    sh -c 'curl -sf http://localhost:9101/metrics 2>/dev/null | wc -l | tr -d " "' \
-    || echo "0")
+  METRICS_AFTER="0"
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    METRICS_AFTER=$(docker compose exec -T ansible \
+      sh -c 'curl -sf http://localhost:9101/metrics 2>/dev/null | wc -l | tr -d " "' \
+      || echo "0")
+    if [ "${METRICS_AFTER}" -gt 0 ]; then
+      break
+    fi
+    sleep 2
+  done
+
+  if [ "${METRICS_AFTER}" -eq 0 ]; then
+    log "exec -d did not bring metrics up — restarting ansible service..."
+    docker compose --profile sim restart ansible
+    sleep 15
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      METRICS_AFTER=$(docker compose exec -T ansible \
+        sh -c 'curl -sf http://localhost:9101/metrics 2>/dev/null | wc -l | tr -d " "' \
+        || echo "0")
+      if [ "${METRICS_AFTER}" -gt 0 ]; then
+        break
+      fi
+      sleep 2
+    done
+  fi
 
   if [ "${METRICS_AFTER}" -gt 0 ]; then
     pass "Metrics endpoint restored (${METRICS_AFTER} lines)"

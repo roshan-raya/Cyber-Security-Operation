@@ -174,8 +174,12 @@ class MetricsHandler(http.server.BaseHTTPRequestHandler):
         return
 
 
+class _ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+
 def main():
-    with socketserver.TCPServer((HOST, PORT), MetricsHandler) as httpd:
+    with _ReusableTCPServer((HOST, PORT), MetricsHandler) as httpd:
         httpd.serve_forever()
 
 
