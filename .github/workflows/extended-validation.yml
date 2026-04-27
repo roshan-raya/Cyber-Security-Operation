@@ -28,9 +28,12 @@ jobs:
     name: Benchmark and chaos tests
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      # Opt into Node 24 for JS actions (removes deprecation warnings until default flips).
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install tools
         run: |
@@ -63,7 +66,7 @@ jobs:
 
       - name: Upload evidence artifacts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: extended-validation-evidence-${{ github.run_id }}
           if-no-files-found: warn

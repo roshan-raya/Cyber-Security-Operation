@@ -216,39 +216,23 @@ for t in targets:
     pass "Target status: ${TARGET_STATUS} (Prometheus monitoring active)"
   fi
 
-  log "Step 6: Restart metrics exporter..."
-  # Why: `exec sh -c 'nohup ... &'` often kills the child when the shell exits. `exec -d` usually
-  # fixes that but some runners still drop the process; fall back to full service restart (same
-  # entrypoint as cold start: metrics_exporter.py on :9101).
-  docker compose exec -d ansible python3 /ansible/metrics_exporter.py 2>/dev/null || true
-  sleep 2
+  log "Step 6: Recover metrics (restart ansible container)..."
+  # Why: `docker compose exec -d` / background shells are unreliable on GitHub-hosted runners.
+  # compose.yml sets container_name: ansible; entrypoint starts metrics_exporter.py on :9101.
+  docker restart ansible
+  sleep 20
 
   log "Step 7: Verify metrics restored..."
   METRICS_AFTER="0"
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
     METRICS_AFTER=$(docker compose exec -T ansible \
       sh -c 'curl -sf http://localhost:9101/metrics 2>/dev/null | wc -l | tr -d " "' \
       || echo "0")
     if [ "${METRICS_AFTER}" -gt 0 ]; then
       break
     fi
-    sleep 2
+    sleep 3
   done
-
-  if [ "${METRICS_AFTER}" -eq 0 ]; then
-    log "exec -d did not bring metrics up — restarting ansible service..."
-    docker compose --profile sim restart ansible
-    sleep 15
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
-      METRICS_AFTER=$(docker compose exec -T ansible \
-        sh -c 'curl -sf http://localhost:9101/metrics 2>/dev/null | wc -l | tr -d " "' \
-        || echo "0")
-      if [ "${METRICS_AFTER}" -gt 0 ]; then
-        break
-      fi
-      sleep 2
-    done
-  fi
 
   if [ "${METRICS_AFTER}" -gt 0 ]; then
     pass "Metrics endpoint restored (${METRICS_AFTER} lines)"
