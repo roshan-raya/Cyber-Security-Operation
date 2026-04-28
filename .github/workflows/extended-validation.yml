@@ -1,29 +1,29 @@
-# Regression-style checks: benchmark (5 performance requirements) + chaos suite.
-# Does not run on every PR — use nightly schedule and/or workflow_dispatch to save CI minutes.
-#
-# How this relates to the main pipeline (.github/workflows/ci.yml):
-#   - CI proves the happy path (lint, compose up, patch orchestrator, report gates).
-#   - This workflow is the “weekend drill”: scripts/benchmark.sh + scripts/chaos-test.sh against the
-#     same docker-compose sim profile, so performance and failure modes stay honest as the stack evolves.
+## Extended validation workflow (benchmark + chaos).
+## Purpose: run deeper regression checks on performance and resilience beyond normal PR CI.
+## Relationship to ci.yml:
+## - ci.yml validates the main happy path quickly.
+## - this workflow validates stress/failure scenarios and uploads evidence artifacts.
 
 name: Extended validation
 
 on:
-  # Manual full regression (benchmark + chaos). Inputs are avoided so the same
-  # workflow runs cleanly on schedule without the inputs context.
+  # Manual full regression (benchmark + chaos) from the Actions tab.
+  # Inputs are intentionally omitted so scheduled and manual executions stay identical.
   workflow_dispatch: {}
   schedule:
-    # Monday 03:15 UTC — change to "15 3 * * *" for daily, or remove this block for manual-only
+    # Weekly run: Monday 03:15 UTC.
+    # For daily execution use: "15 3 * * *".
     - cron: "15 3 * * 1"
 
 concurrency:
+  # Avoid overlapping extended-validation runs on the same ref.
   group: extended-validation-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
   contents: read
 
-# Applies to every JavaScript action (GitHub deprecation guidance).
+# Applies to JavaScript actions for runtime compatibility guidance.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      # Pin SHAs so runs cannot silently resolve older major tags (Node 20-era actions).
+      # Pin SHAs to keep action versions deterministic.
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -55,6 +55,7 @@ jobs:
           sleep 45
 
       - name: Health sanity check
+        # Quick baseline check before running longer benchmark/chaos stages.
         run: make validate
 
       - name: Run benchmark
@@ -62,11 +63,12 @@ jobs:
 
       - name: Run chaos tests
         env:
-          # Same secret as ci.yml / patch.yml so chaos_summary + scenario webhooks fire when configured.
+          # Reuse the same webhook secret as ci.yml / patch.yml for consistent notifications.
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: make chaos-test
 
       - name: Upload evidence artifacts
+        # Always upload evidence so failed runs still provide traceable outputs for analysis.
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

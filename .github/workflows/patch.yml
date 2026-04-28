@@ -1,9 +1,16 @@
+## Operational patch workflow for this project.
+## Purpose: run the real patch path on main/schedule/manual trigger,
+## then validate report/fleet gates, notify on failure, and rollback when patch execution fails.
+## This complements ci.yml (PR/branch validation) by representing maintenance execution.
 name: Patch Orchestration
 
 on:
+  # Auto-run after merge to main (operational readiness check).
   push:
     branches: [main]
+  # Manual run from Actions tab during demo/maintenance windows.
   workflow_dispatch:
+  # Daily scheduled patch orchestration (02:00 UTC).
   schedule:
     - cron: '0 2 * * *'
 
@@ -29,6 +36,7 @@ jobs:
           docker compose --profile sim up -d
 
       - name: Wait for services
+        # Simple startup buffer; can be replaced later by a health-check loop.
         run: sleep 30
 
       - name: Run patch
@@ -36,6 +44,7 @@ jobs:
         run: make patch
 
       - name: Validate fleet size and report gates
+        # Enforces minimum target coverage + report KPI thresholds after patch run.
         id: validate_post_patch
         run: |
           make validate-patch-fleet
@@ -46,6 +55,7 @@ jobs:
         continue-on-error: true
 
       - name: Notify on failure
+        # Sends run URL to Slack if webhook secret is configured.
         if: failure()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -58,6 +68,7 @@ jobs:
           fi
 
       - name: Trigger rollback on patch failure
+        # Rollback only if the patch step itself failed (not for lint/setup issues).
         if: failure() && steps.patch_run.outcome == 'failure'
         run: make rollback
 

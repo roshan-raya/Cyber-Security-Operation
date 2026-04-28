@@ -1,8 +1,6 @@
-# Continuous integration for this repo’s patch-management demo stack.
-#
-# Rough narrative of the job below: install linters → build compose sim images → bring the stack up
-# → ansible-lint + syntax-check → run the same `make patch` path developers use → assert reports/metrics.
-# If this workflow is red, compare with local `make up-sim` + `make patch` + `make validate-reports`.
+# CI gate for the patch-management stack.
+# This is the same execution path used locally: lint -> compose sim build/up -> patch run -> report gates.
+# If CI fails, reproduce with: make up-sim && make patch && make validate-reports
 name: CI - Patch Management
 
 on:
@@ -26,6 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install ansible-lint
           sudo apt-get update
           sudo apt-get install -y make jq
@@ -44,6 +43,7 @@ jobs:
         run: |
           cp .env.example .env
           docker compose --profile sim up -d
+          docker compose --profile sim ps
           sleep 45
 
       - name: Ansible syntax check
