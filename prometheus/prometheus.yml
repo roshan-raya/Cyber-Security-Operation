@@ -1,10 +1,10 @@
-# Prometheus: collects metrics, evaluates alert.rules.yml, forwards firing alerts to Alertmanager.
+# Prometheus: scrapes metrics, evaluates alert.rules.yml, forwards firing alerts to Alertmanager.
 #
 # How this file fits the patch story:
-#   - Job "patch_metrics" scrapes the ansible container (see docker-compose.yml expose 9101).
-#     That HTTP endpoint is ansible/metrics_exporter.py serving Ansible-written patch_metrics.prom.
-#   - Job "node-exporter" feeds the node dashboards; labels here should match what Grafana queries expect.
-#   - Alert definitions live in alert.rules.yml; routing/notifications live in alertmanager/alertmanager.yml.
+#   - Job "patch_metrics" scrapes ansible:9101 (metrics_exporter.py serving patch_metrics.prom).
+#   - Job "node-exporter" feeds host/node dashboards.
+#   - Alert definitions are in prometheus/alert.rules.yml.
+#   - Notification routing (Slack/Webhook/PagerDuty) is handled in alertmanager/alertmanager.yml.
 global:
   scrape_interval: 5m
   evaluation_interval: 5m
@@ -56,7 +56,7 @@ scrape_configs:
     scrape_interval: 60s
     static_configs:
       - targets:
-          - host.docker.internal:9102
+          - soc-kpi-exporter:9102
         labels:
           role: soc-kpi
 
