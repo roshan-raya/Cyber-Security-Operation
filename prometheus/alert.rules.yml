@@ -4,6 +4,9 @@
 # Patch-related metrics (patch_*) are produced by the reporting role template
 # ansible/roles/reporting/templates/patch_metrics.prom.j2 and served via ansible/metrics_exporter.py.
 # If you change metric names or labels there, update these expr blocks and Grafana queries together.
+# This file includes both early-warning thresholds and critical escalations, including:
+# - 2-hour SLA breach (PatchDurationSLAExceeded)
+# - metrics freshness/absence checks (PatchMetricsStale, PatchComplianceMetricMissing)
 groups:
   - name: example
     interval: 1m
@@ -48,6 +51,15 @@ groups:
         annotations:
           summary: "No patch run in the last 24 hours"
 
+      - alert: PatchMetricsStale
+        expr: up{job="patch_metrics"} == 1 and (time() - patch_last_run_timestamp) > 21600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Patch metrics are stale"
+          description: "Patch metrics exporter is up but last run timestamp is older than 6 hours."
+
   - name: patch_alerts_critical
     interval: 1m
     rules:
@@ -74,6 +86,32 @@ groups:
           severity: warning
         annotations:
           summary: "Patch compliance below 80% (current: {{ $value }}%)"
+
+      - alert: PatchDurationSLAExceeded
+        expr: patch_run_duration_seconds > 7200
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Patch run exceeded 2-hour SLA"
+          description: "Patch duration is {{ $value }}s (SLA: <= 7200s)."
+
+      - alert: PatchComplianceCritical
+        expr: patch_compliance_percentage < 80
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Patch compliance critically low (current: {{ $value }}%)"
+
+      - alert: PatchComplianceMetricMissing
+        expr: absent(patch_compliance_percentage)
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Patch compliance metric missing"
+          description: "patch_compliance_percentage metric is absent."
 
   - name: security_scan_alerts
     interval: 1m

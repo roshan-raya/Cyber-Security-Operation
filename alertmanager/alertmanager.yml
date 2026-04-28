@@ -1,14 +1,17 @@
-# Alertmanager — takes firing alerts from Prometheus and decides who gets notified how.
+# Alertmanager — receives firing alerts from Prometheus and routes notifications.
 #
-# Upstream: prometheus/prometheus.yml (alerting.alertmanagers) + prometheus/alert.rules.yml (rules).
-# Downstream: receivers below (webhook vs console). docker-compose.yml wires this file into the container.
+# Upstream:
+#   - prometheus/prometheus.yml (alerting.alertmanagers)
+#   - prometheus/alert.rules.yml (alert definitions)
 #
-# Routing logic (human view):
-#   critical → webhook receiver (visible at ALERTMANAGER_WEBHOOK_URL in real time)
-#   warning  → console (appears in: docker compose logs alertmanager)
+# Routing logic (current):
+#   - critical -> webhook-critical + slack-critical + pagerduty-critical
+#   - warning  -> slack-warning
+#   - fallback -> console
 #
-# For production: replace webhook_url with Slack incoming webhook or PagerDuty endpoint.
-# Set ALERTMANAGER_WEBHOOK_URL in .env to a https://webhook.site URL for demo use.
+# Secret handling:
+#   This tracked file stores placeholders (__...__). docker-compose renders a runtime
+#   /tmp/alertmanager.yml from .env values at container start.
 
 global:
   resolve_timeout: 5m
@@ -30,9 +33,25 @@ route:
       group_wait: 5s
       group_interval: 15s
       repeat_interval: 1h
+      continue: true
+
+    - receiver: 'slack-critical'
+      matchers:
+        - severity="critical"
+      group_wait: 5s
+      group_interval: 15s
+      repeat_interval: 1h
+      continue: true
+
+    - receiver: 'pagerduty-critical'
+      matchers:
+        - severity="critical"
+      group_wait: 5s
+      group_interval: 15s
+      repeat_interval: 1h
       continue: false
 
-    - receiver: 'console'
+    - receiver: 'slack-warning'
       matchers:
         - severity="warning"
       group_wait: 30s
@@ -56,11 +75,43 @@ receivers:
 
   - name: 'webhook-critical'
     webhook_configs:
-      - url: 'https://webhook.site/53813426-de90-4268-a2d4-eabee6ee7fa4'
-        # Why: webhook.site provides a free HTTPS endpoint that shows incoming
-        # POSTs in real time — perfect for demo purposes without any infrastructure.
-        # Set ALERTMANAGER_WEBHOOK_URL=https://webhook.site/YOUR-UUID in .env
+      - url: '__ALERTMANAGER_WEBHOOK_URL__'
         send_resolved: true
         max_alerts: 20
         http_config:
           follow_redirects: true
+
+  - name: 'slack-warning'
+    slack_configs:
+      - api_url: '__SLACK_WEBHOOK_URL__'
+        send_resolved: true
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: >-
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Job:* {{ .CommonLabels.job }}
+          *Instance:* {{ .CommonLabels.instance }}
+
+  - name: 'slack-critical'
+    slack_configs:
+      - api_url: '__SLACK_WEBHOOK_URL__'
+        send_resolved: true
+        title: '[{{ .Status | toUpper }}][CRITICAL] {{ .CommonLabels.alertname }}'
+        text: >-
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Job:* {{ .CommonLabels.job }}
+          *Instance:* {{ .CommonLabels.instance }}
+
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - routing_key: '__PAGERDUTY_ROUTING_KEY__'
+        send_resolved: true
+        severity: 'critical'
+        description: '{{ .CommonAnnotations.summary }}'
+        details:
+          alertname: '{{ .CommonLabels.alertname }}'
+          job: '{{ .CommonLabels.job }}'
+          instance: '{{ .CommonLabels.instance }}'
+ 
+ 

@@ -1,108 +1,144 @@
 # Technical Architecture
-**Catnip Games International — Automated Patch Management System**
+**Catnip Games International — Automated Patch Management System (as built)**
 
-## System Overview
+## 1. Scope and reality check
 
-This system automates security patch deployment across approximately 300 Linux servers
-spanning two data centres (DC1, DC2). Ansible orchestrates patch operations, Prometheus
-and Grafana provide real-time observability, and Docker Compose reproduces the full
-environment locally for development and assessment.
+This document describes the architecture that is currently implemented in this repository.
+The coursework scenario references a 300-server, two-datacentre estate. This repo models
+that with a Docker Compose simulation: one Ansible control node and five Linux patch targets.
 
-## Architecture
+The goal is not full production parity. The goal is a reproducible implementation that proves:
+- automated patch orchestration
+- monitoring and alerting
+- rollback and recovery flows
+- CI validation gates
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      GitHub Actions CI/CD                        │
-│    lint ──► build ──► syntax-check ──► patch ──► gate-check     │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │ triggers on push to main/develop
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Ansible Control Node                          │
-│                                                                 │
-│  patch_orchestrator.yml                                         │
-│    Play 1 — runs on all patch targets in parallel               │
-│      ├── Role: common       records start time and defaults     │
-│      ├── Role: health_check SSH ping, uptime, sshd active       │
-│      ├── Role: patch        apt update → upgrade → reboot       │
-│      │     rescue block ──► rollback.yml (if enabled)           │
-│      └── (failure flags captured per host)                      │
-│                                                                 │
-│    Play 2 — runs on localhost only                              │
-│      └── Role: reporting    JSON + CSV + .prom metrics files    │
-│                                                                 │
-│  patch_metrics_exporter.py  serves /metrics on port 9101        │
-└──────────┬──────────────────────────────────────────────────────┘
-           │ SSH (key-based auth, devops user, sudo for apt)
-    ┌──────┴──────────────────────────────────────┐
-    ▼                                             ▼
-[DC1: patch-target-1, 2, 3]           [DC2: patch-target-4, 5]
-Ubuntu containers, SSH + apt          Ubuntu containers, SSH + apt
-Dockerfile: ansible/target/           SSH key injected via volume
+## 2. High-level architecture
 
-Metrics pipeline:
-  ansible:9101/metrics
-       │
-       ▼
-  Prometheus:9090  ─── evaluates alert.rules.yml every 1 min
-       │                       │
-       ▼                       ▼
-  Grafana:3000          Alertmanager:9093
-  node-overview           ├── warning  → console (docker logs)
-  dashboard               └── critical → ALERTMANAGER_WEBHOOK_URL
+```text
+GitHub (push/PR/schedule)
+        |
+        v
+GitHub Actions workflows
+  - ci.yml
+  - patch.yml
+  - extended-validation.yml
+        |
+        v
+Docker Compose (--profile sim)
+  +-------------------------------------+
+  | Ansible control node                |
+  | - playbooks + roles + inventory     |
+  | - metrics_exporter.py (:9101)       |
+  +-------------------------------------+
+        | SSH
+        v
+  patch-target-1 ... patch-target-5
 
-  patch_metrics_exporter also exposes:
-    patch_scan_critical_cves  — CVEs remaining post-patch per host
-    patch_scan_high_cves      — High CVEs remaining per host
+Ansible writes:
+  /ansible/reports/*.json, *.csv, *.prom
+        |
+        v
+Prometheus (:9090) -> Grafana (:3000)
+        |
+        v
+Alertmanager (:9093)
 ```
 
-## Component Responsibilities
+## 3. Patch execution flow
 
-| Component | Technology | Responsibility |
+Main playbook: `ansible/playbooks/patch_orchestrator.yml`
+
+- **Play 1 (hosts: all, strategy: free)**
+  - `common`
+  - `health_check`
+  - `patch`
+  - `security_scan`
+- **Play 2 (hosts: localhost)**
+  - `reporting`
+
+Patch role behaviour in `ansible/roles/patch/tasks/main.yml`:
+- capture pre-patch package snapshot
+- `apt update_cache`
+- `apt upgrade: safe`
+- detect reboot requirement and reboot when needed
+- `rescue` path can include `rollback.yml` when `rollback_enabled=true`
+
+## 4. Runtime components
+
+| Component | Implementation | Notes |
 |---|---|---|
-| Ansible control node | Ansible 2.x in Docker | Orchestrates all patch operations |
-| patch-target-1 to 5 | Ubuntu Docker containers | Simulate production Linux servers |
-| Prometheus | prom/prometheus:v2.52.0 | Scrapes metrics, evaluates 7 alert rules |
-| Grafana | grafana/grafana:10.4.2 | Visualises compliance, duration, host status |
-| Alertmanager | prom/alertmanager:v0.27.0 | Routes alerts by severity to receivers |
-| GitHub Actions CI | ubuntu-latest runner | Lint, build, patch, gate-check on every push |
-| Node Exporter | prom/node-exporter:v1.8.0 | Host-level system metrics (x2 in sim profile) |
-| Security scan role | Trivy (binary) | Post-patch CVE scan; exposes critical/high counts as metrics |
-| Ansible Vault | ansible-vault | Encrypts secrets at rest; safe to commit ciphertext to repo |
+| Orchestration | Ansible container (`ansible/`) | Executes playbooks against simulated targets |
+| Patch targets | `patch-target-1..5` | Built from `ansible/target/Dockerfile` |
+| Monitoring | Prometheus | Scrapes exporters and evaluates `prometheus/alert.rules.yml` |
+| Dashboards | Grafana | Provisioned from `grafana/provisioning/` |
+| Alert routing | Alertmanager | Config in `alertmanager/alertmanager.yml` |
+| Host metrics (sim) | node-exporter-1, node-exporter-2 | Enabled under `--profile sim` |
+| Patch metrics | `ansible/metrics_exporter.py` + reporting role | Serves metrics from report outputs on port 9101 |
+| CI validation | GitHub Actions | Runs lint/build/patch/gates in workflows |
 
-## Inventory Structure
+## 5. Inventory model
 
-```
-hosts.ini          canary → dc1 (targets 1-3) → dc2 (targets 4-5)
-production.ini     blue group (3,4) / green group (5)
-staging.ini        staging group (targets 1-2)
-dev.ini            dev group (target 1 only)
-```
+Implemented inventory files:
+- `ansible/inventory/hosts.ini`
+- `ansible/inventory/dev.ini`
+- `ansible/inventory/staging.ini`
+- `ansible/inventory/production.ini`
 
-All inventory files share the same SSH user and key path via group_vars/all.yml.
+Examples of grouping used by current files:
+- canary, dc1, dc2
+- blue, green
+- patch_targets
 
-## Performance Requirements
+Shared target connection vars are defined in `ansible/inventory/group_vars/all.yml`.
 
-| Requirement | Target | How enforced |
-|---|---|---|
-| Patch window | ≤ 2 hours | `make validate-reports` and CI gate check duration_seconds ≤ 7200 |
-| Concurrent updates | ≥ 5 | `strategy: free` in patch_orchestrator.yml + 5 targets |
-| Monitoring refresh | ≤ 5 minutes | `scrape_interval: 5m` global in prometheus.yml |
-| Patch success rate | ≥ 95% | CI gate rejects compliance_percentage < 95 |
-| System backups | Required | `scripts/backup.sh` creates Docker volume snapshots with SHA256 manifest |
+## 6. CI/CD architecture
 
-## Security Design
+### `ci.yml` (PR and branch validation)
+- ansible-lint
+- build sim images
+- bring stack up
+- syntax-check playbooks
+- run `make patch`
+- enforce report gates:
+  - compliance >= 95
+  - duration <= 7200 seconds
+  - failed hosts == 0
+- validate minimum patch fleet size
 
-- All containers run as non-root (`nobody`, `grafana` users)
-- `read_only: true` on Prometheus and Grafana containers
-- SSH keys generated at container startup, stored in Docker volume, never in image
-- Sensitive operator secrets stored in Ansible Vault (`ansible/vault/secrets.yml`); `.env` holds Docker-only defaults (gitignored) — never commit live secrets
-- Internal services (node-exporter port 9100, metrics-exporter port 9101) bound to
-  Docker network only — not published to host
-- See `SECURITY.md` for full hardening documentation
+### `patch.yml` (operational patch workflow)
+- trigger: push to `main`, scheduled cron, manual dispatch
+- run patch + report validation
+- optional rollback on patch failure
 
-## Architecture Decision Records
+### `extended-validation.yml` (regression and resilience)
+- run benchmark and chaos tests
+- upload evidence artifacts
 
-Structured rationale for major technology choices (Ansible, Docker Compose, Prometheus)
-lives in [docs/adr/README.md](adr/README.md). Use these ADRs for design reviews and
-assessment Q&A.
+## 7. Security and resilience controls (implemented)
+
+- Prometheus and Grafana run as non-root users with read-only rootfs in Compose.
+- Ansible SSH key is generated inside the container runtime and persisted via volume.
+- Secrets workflow exists via `ansible/vault/` and `.env` template usage.
+- Rollback and recovery are implemented:
+  - `ansible/playbooks/rollback.yml`
+  - `ansible/roles/patch/tasks/rollback.yml`
+  - `docs/recovery-runbook.md`
+  - `scripts/backup.sh` and `scripts/restore.sh`
+
+For full hardening posture and operational guidance, see `SECURITY.md`.
+
+## 8. Known limitations
+
+- This is a simulation environment, not direct production deployment to 300 servers.
+- Alertmanager includes demo-friendly routing defaults; production notification controls
+  would require environment-specific secrets and policy.
+- Some evidence/report files are generated by workflows and may be absent locally unless
+  corresponding scripts have been run.
+
+## 9. Related design decisions
+
+Architecture decisions are documented in:
+- `docs/adr/ADR-001.md` (Ansible)
+- `docs/adr/ADR-002.md` (Docker Compose simulation)
+- `docs/adr/ADR-003.md` (Prometheus/Grafana stack)

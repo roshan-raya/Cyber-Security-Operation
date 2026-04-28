@@ -1,1 +1,80 @@
+<<<<<<< Updated upstream
 []
+=======
+
+{
+  "receiver": "webhook-critical",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PatchComplianceMetricMissing",
+        "severity": "critical"
+      },
+      "annotations": {
+        "description": "patch_compliance_percentage metric is absent.",
+        "summary": "Patch compliance metric missing"
+      },
+      "startsAt": "2026-04-28T12:29:17.462Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://08579449daa9:9090/graph?g0.expr=absent%28patch_compliance_percentage%29&g0.tab=1",
+      "fingerprint": "d486a5b32945f84f"
+    }
+  ],
+  "groupLabels": {
+    "alertname": "PatchComplianceMetricMissing",
+    "severity": "critical"
+  },
+  "commonLabels": {
+    "alertname": "PatchComplianceMetricMissing",
+    "severity": "critical"
+  },
+  "commonAnnotations": {
+    "description": "patch_compliance_percentage metric is absent.",
+    "summary": "Patch compliance metric missing"
+  },
+  "externalURL": "http://9a2d1a3da8a2:9093",
+  "version": "4",
+  "groupKey": "{}/{severity=\"critical\"}:{alertname=\"PatchComplianceMetricMissing\", severity=\"critical\"}",
+  "truncatedAlerts": 0
+}
+
+{
+  "receiver": "webhook-critical",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PatchComplianceMetricMissing",
+        "severity": "critical"
+      },
+      "annotations": {
+        "description": "patch_compliance_percentage metric is absent.",
+        "summary": "Patch compliance metric missing"
+      },
+      "startsAt": "2026-04-28T12:29:17.462Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://08579449daa9:9090/graph?g0.expr=absent%28patch_compliance_percentage%29&g0.tab=1",
+      "fingerprint": "d486a5b32945f84f"
+    }
+  ],
+  "groupLabels": {
+    "alertname": "PatchComplianceMetricMissing",
+    "severity": "critical"
+  },
+  "commonLabels": {
+    "alertname": "PatchComplianceMetricMissing",
+    "severity": "critical"
+  },
+  "commonAnnotations": {
+    "description": "patch_compliance_percentage metric is absent.",
+    "summary": "Patch compliance metric missing"
+  },
+  "externalURL": "http://9a2d1a3da8a2:9093",
+  "version": "4",
+  "groupKey": "{}/{severity=\"critical\"}:{alertname=\"PatchComplianceMetricMissing\", severity=\"critical\"}",
+  "truncatedAlerts": 0
+}
+>>>>>>> Stashed changes

@@ -1,9 +1,15 @@
 # Automated Patch Management System
-# Catnip Games International - DevOps Team
+**Catnip Games International - DevOps Team**
 
 ## Overview
-This repository contains an automated patch management platform for Linux infrastructure. Ansible orchestrates patch deployment, while Prometheus, Grafana, and Alertmanager provide monitoring and alerting around patch operations.
-Catnip Games manages 300 Linux servers. This system is designed to automate patch rollout with validation gates for compliance and runtime.
+This repository implements automated Linux patch operations with:
+- Ansible patch orchestration and reporting
+- Prometheus/Grafana/Alertmanager monitoring and alerting
+- rollback, backup, and recovery procedures
+- CI workflows that enforce report gates
+
+The coursework scenario references a 300-server estate. This repo is the as-built
+simulation environment (5 patch targets) used for development, testing, and assessment.
 
 ## Architecture
 ```text
@@ -65,7 +71,7 @@ Makefile
    - Prometheus: http://localhost:9090
    - Grafana: http://localhost:3000
 
-## Make Commands Table
+## Make Commands
 | Command | Description |
 |---|---|
 | `make up` | Start monitoring services |
@@ -93,9 +99,9 @@ Makefile
 | `make restore` | Restore from backup snapshot (requires BACKUP_DIR=backups/path) |
 | `make patch-with-backup` | Run backup then patch in a single command |
 | `make chaos-test` | Run all chaos engineering scenarios |
-| `make benchmark` | Prove all 5 performance requirements with evidence |
+| `make benchmark` | Run benchmark workflow and generate performance evidence |
 
-## Documentation Index
+## Documentation
 
 | Document | Purpose |
 |---|---|
@@ -103,16 +109,16 @@ Makefile
 | [docs/recovery-runbook.md](docs/recovery-runbook.md) | Step-by-step operator recovery procedures |
 | [docs/process-workflow.md](docs/process-workflow.md) | Full patch lifecycle — CI and manual paths |
 | [docs/test-cases.md](docs/test-cases.md) | TC-001 through TC-017 with commands and pass criteria |
-| [docs/demo-script.md](docs/demo-script.md) | In-lab demo sequence and Q&A preparation |
-| [docs/screencast-script.md](docs/screencast-script.md) | 5-minute individual screencast script |
 | [docs/chaos-testing.md](docs/chaos-testing.md) | Chaos engineering scenarios and recovery proof |
-| [docs/onboarding.md](docs/onboarding.md) | New engineer setup guide |
 | [docs/adr/ADR-001.md](docs/adr/ADR-001.md) | Why Ansible for orchestration |
 | [docs/adr/ADR-002.md](docs/adr/ADR-002.md) | Why Docker Compose for test environment |
 | [docs/adr/ADR-003.md](docs/adr/ADR-003.md) | Why Prometheus over hosted monitoring |
 | [docs/security-review-checklist.md](docs/security-review-checklist.md) | Hardening review checklist and formal sign-off (weeks 9–10) |
 
-**CI:** Pull requests run [`.github/workflows/ci.yml`](.github/workflows/ci.yml). **Extended validation** ([`.github/workflows/extended-validation.yml`](.github/workflows/extended-validation.yml)) runs `make benchmark` and `make chaos-test` weekly and on manual workflow dispatch; it uploads evidence under Actions artifacts.
+Pull requests run [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Extended validation
+([`.github/workflows/extended-validation.yml`](.github/workflows/extended-validation.yml))
+runs `make benchmark` and `make chaos-test` weekly and on manual dispatch, then uploads
+evidence as workflow artifacts.
 
 ## Validation Checklist
 Run in order:
@@ -153,7 +159,7 @@ Then confirm:
 > Critical alerts (PatchFailureCritical, PatchHostUnreachable) will POST there within 5 seconds.
 
 ## Recovery Procedures
-Full step-by-step operator runbook: [docs/recovery-runbook.md](docs/recovery-runbook.md)
+Step-by-step operator runbook: [docs/recovery-runbook.md](docs/recovery-runbook.md)
 
 Quick reference:
 

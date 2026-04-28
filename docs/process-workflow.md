@@ -1,139 +1,82 @@
 # Process Workflow — Patch Lifecycle
-**Catnip Games International — Patch Management System**
+**Catnip Games International — Patch Management System (as built)**
 
-This document describes every stage of the patch lifecycle from trigger to verified
-compliance report, covering both the automated CI path and the manual operator path.
-
----
-
-## Automated CI Workflow (GitHub Actions)
-
-Triggered on: push to `main`, `develop`; any pull request.
-
-```
-Push / Pull Request
-        │
-        ▼
-Step 1: Ansible lint check (ansible-lint ansible/)
-        │── FAIL ──► Block merge. Fix lint errors.
-        │
-        ▼
-Step 2: Build Docker images (--profile sim, --no-cache)
-        │── FAIL ──► Build error. Check Dockerfile syntax.
-        │
-        ▼
-Step 3: Start full stack
-        │   cp .env.example .env
-        │   docker compose --profile sim up -d
-        │   sleep 45
-        │
-        ▼
-Step 4: Ansible syntax check (--syntax-check only, no execution)
-        │── FAIL ──► Block merge. Fix playbook YAML syntax.
-        │
-        ▼
-Step 5: Run patch orchestration (make patch)
-        │
-        │   Play 1 runs on all 5 targets in parallel (strategy: free):
-        │     Role: common
-        │       └── record patch_start_epoch
-        │           set patch_failed = false
-        │     Role: health_check
-        │       └── gather_facts
-        │           ping (connection check)
-        │           uptime check
-        │           SSH service check
-        │     Role: patch
-        │       ├── capture pre-patch package snapshot ──► rollback_packages fact
-        │       └── block:
-        │             apt update_cache
-        │             apt upgrade: safe
-        │             check /var/run/reboot-required
-        │             reboot if required
-        │             wait_for_connection
-        │             assert uptime >= 0
-        │           rescue:
-        │             set patch_failed = true
-        │             include rollback.yml (if rollback_enabled=true)
-        │
-        │   Play 2 runs on localhost only:
-        │     Role: reporting
-        │       └── build patch_report_list from hostvars
-        │           calculate compliance_percentage
-        │           write patch_report_<epoch>.json
-        │           write patch_report_latest.json
-        │           write patch_report_latest.csv
-        │           write patch_metrics.prom
-        │
-        ▼
-Step 6: Validate report gates
-        │   compliance_percentage >= 95? ─── NO ──► FAIL pipeline
-        │   duration_seconds <= 7200?    ─── NO ──► FAIL pipeline
-        │   failed_hosts == 0?           ─── NO ──► FAIL pipeline
-        │── ALL PASS ──► Pipeline succeeds
-        │
-        ▼
-Step 7: Tear down (always runs, even on failure)
-        docker compose --profile sim down -v
-```
+This document describes how patching is currently run in this repository, both in CI and
+for manual operator runs.
 
 ---
 
-## Manual Operator Workflow
+## 1) CI workflow (GitHub Actions)
+
+Primary validation workflow: `.github/workflows/ci.yml`
+
+Trigger:
+- push to `main`, `master`, `develop`
+- pull request
+
+Execution order:
+1. `ansible-lint ansible/`
+2. `docker compose --profile sim build --no-cache`
+3. start stack (`cp .env.example .env`, `docker compose --profile sim up -d`, sleep 45)
+4. playbook syntax checks
+5. `make patch`
+6. gate checks from `/ansible/reports/patch_report_latest.json`:
+   - compliance >= 95
+   - duration <= 7200 seconds
+   - failed hosts == 0
+7. `make validate-patch-fleet`
+8. optional rollback on patch step failure
+9. `docker compose --profile sim down -v` (always)
+
+Operational workflow: `.github/workflows/patch.yml`
+- push to `main`, scheduled cron, manual dispatch
+- runs `make patch`, validates reports/fleet, optional rollback, then teardown
+
+Extended regression workflow: `.github/workflows/extended-validation.yml`
+- runs `make benchmark` and `make chaos-test`
+- uploads evidence artifacts
+
+---
+
+## 2) Manual operator workflow
 
 ### Standard patch window
 
-```
-Before patching:
-  1.  git pull origin main
-  2.  docker compose --profile sim up -d && sleep 30
-  3.  make validate                       ← Prometheus + Grafana healthy?
-  4.  make patch-health                   ← all 5 targets reachable?
-  5.  make backup LABEL=pre-patch-YYYYMMDD  ← snapshot volumes
-  6.  make patch-dryrun                   ← review what will change
-
-Patch execution:
-  7.  make patch                          ← run the patch
-  8.  make validate-reports               ← ≥95% compliance confirmed?
-  9.  make patch-report                   ← read the full JSON report
-  10. open http://localhost:3000          ← confirm Grafana shows new data
-
-Post-patch:
-  11. Archive proof: docker compose exec ansible \
-        cat /ansible/reports/patch_report_latest.json \
-        > docs/evidence/patch-YYYYMMDD.json
+```bash
+git pull origin main
+docker compose --profile sim up -d
+sleep 30
+make validate
+make patch-health
+make backup LABEL=pre-patch-YYYYMMDD
+make patch-dryrun
+make patch
+make validate-reports
+make patch-report
 ```
 
-### Targeted patch (single host or group)
+Validation checkpoints:
+- Prometheus targets are up at `http://localhost:9090/targets`
+- Grafana loads at `http://localhost:3000`
+- latest report passes compliance and duration checks
+
+### Targeted patch execution
 
 ```bash
 # Single host
 make patch ENV=hosts LIMIT=patch-target-3
 
-# Staging environment only
+# Staging only
 make patch-staging
 
-# Blue group only (before patching green)
+# Blue/green split
 make patch-blue
 make validate-reports
 make patch-green
 make validate-reports
 ```
 
-### Phased production-style rollout (canary → batch → remainder)
-
-For lab environments mirroring production controls, run the phased playbook instead of
-patching every host in parallel:
-
-```bash
-make patch-canary-phased
-```
-
-This executes `playbooks/patch_canary.yml`: one canary host, a two-host batch, then
-the remaining hosts, with health gates between phases and `max_fail_percentage`
-limits so a canary failure stops the run before wider exposure.
-
-### Emergency rollback for a specific host
+### Emergency rollback (single host)
 
 ```bash
 docker compose exec ansible \
@@ -145,43 +88,43 @@ docker compose exec ansible \
 
 ---
 
-## Chaos and performance verification (Sprint 3)
+## 3) Patch report artifacts
 
-After major changes or before a demo, run automated resilience and SLO evidence:
-
-```bash
-make benchmark          # full patch + backup check + writes performance-report.md
-make chaos-test         # all three chaos scenarios (or chaos-test-1 / -2 / -3)
-```
-
-Narrative and expected behaviour: [docs/chaos-testing.md](chaos-testing.md).
-Evidence paths: `docs/evidence/chaos/`, `docs/evidence/performance-report.md`.
-
----
-
-## Report Artefacts
-
-After every patch run, the reporting role writes four files inside the ansible container:
+The reporting role writes artifacts to `/ansible/reports/`:
 
 | File | Format | Purpose |
 |---|---|---|
-| `patch_report_latest.json` | JSON | Machine-readable; used by validate-reports and CI gate |
-| `patch_report_<epoch>.json` | JSON | Timestamped archive; retained for audit trail |
-| `patch_report_latest.csv` | CSV | Human-readable; can be opened in spreadsheet tools |
-| `patch_metrics.prom` | Prometheus text | Scraped by Prometheus via metrics_exporter.py |
-| `patch_report_latest.json.sha256` | Text | SHA256 checksum line for `patch_report_latest.json` (integrity verification) |
-| `audit_trail.log` | Text | Append-only log of each run: timestamp, env, group, compliance, duration, checksum |
+| `patch_report_latest.json` | JSON | Main report used by `validate-reports` and CI gates |
+| `patch_report_<epoch>.json` | JSON | Timestamped archive |
+| `patch_report_latest.csv` | CSV | Human-readable summary |
+| `patch_metrics.prom` | Prometheus text | Scraped by Prometheus via `metrics_exporter.py` |
+| `patch_report_latest.json.sha256` | Text | Integrity checksum for latest JSON report |
+| `audit_trail.log` | Text | Append-only audit lines per run |
 
-Key fields in the JSON report:
-- `compliance_percentage` — (successful_hosts / total_hosts) × 100
-- `duration_seconds` — wall-clock time from first host start to report write
-- `hosts[]` — per-host array with: host, changed, failed, rebooted, rollback_performed
-- `environment` — value of patch_environment variable at run time
-- `group` — value of patch_group variable at run time
+Key JSON fields used by gates and dashboards:
+- `compliance_percentage`
+- `duration_seconds`
+- `hosts[]` (host, changed, failed, rebooted, rollback_performed)
+- `environment`
+- `group`
 
 ---
 
-## Alert Rules Reference
+## 4) Chaos and performance runs
+
+Run before demo or after major changes:
+
+```bash
+make benchmark
+make chaos-test
+```
+
+Reference: [docs/chaos-testing.md](chaos-testing.md)  
+Current committed evidence path: `docs/evidence/chaos/`
+
+---
+
+## 5) Alert rules currently used
 
 | Alert name | Condition | Severity | Fires after |
 |---|---|---|---|
