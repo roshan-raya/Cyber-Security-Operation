@@ -90,14 +90,15 @@ for ARCHIVE in "${BACKUP_DIR}"/*.tar.gz; do
   VOLUME=$(basename "${ARCHIVE}" .tar.gz)
   printf "  %-45s" "Restoring ${VOLUME}..."
 
-  # Verify checksum against manifest before touching anything
-  EXPECTED=$(python3 -c "
-import json, sys
-with open('${MANIFEST}') as f:
-    m = json.load(f)
-vols = [v for v in m.get('volumes', []) if v.get('volume') == '${VOLUME}']
-print(vols[0].get('sha256', '') if vols else '')
-" 2>/dev/null)
+  # Verify checksum against manifest before touching anything.
+  # Bash-native JSON parsing — no python3 / jq dependency on the host.
+  # Why: python3 on Windows often points to a Microsoft Store stub, and jq is
+  # not bundled with Git Bash. The manifest format is deterministic (written
+  # by backup.sh) so a regex extract on the volume's entry is safe and fast.
+  EXPECTED=$(grep -oE "\"volume\":\"${VOLUME}\"[^}]*" "${MANIFEST}" 2>/dev/null \
+             | grep -oE "\"sha256\":\"[a-f0-9]{64}\"" \
+             | grep -oE "[a-f0-9]{64}" \
+             || echo "")
 
   if [ -n "${EXPECTED}" ]; then
     ACTUAL=$(${SHA256_CMD} "${ARCHIVE}" | cut -d' ' -f1)
