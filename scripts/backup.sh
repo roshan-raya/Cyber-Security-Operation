@@ -20,6 +20,15 @@ else
   exit 1
 fi
 
+# Cross-platform path handling: Docker Desktop on Windows (Git Bash / MSYS) needs
+# Windows-style paths (C:/Users/...) for bind mounts. Linux and macOS use $(pwd) directly.
+if [ -n "${MSYSTEM:-}" ]; then
+  export MSYS_NO_PATHCONV=1
+  PWD_NATIVE="$(pwd -W)"
+else
+  PWD_NATIVE="$(pwd)"
+fi
+
 LABEL="${1:-pre-patch}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="backups/${TIMESTAMP}_${LABEL}"
@@ -65,7 +74,7 @@ for VOLUME in "${VOLUMES[@]}"; do
   # Archive via disposable alpine container — no data touches the host filesystem directly
   if docker run --rm \
     -v "${VOLUME}:/source:ro" \
-    -v "$(pwd)/${BACKUP_DIR}:/dest" \
+    -v "${PWD_NATIVE}/${BACKUP_DIR}:/dest" \
     alpine:3.19 \
     tar czf "/dest/${VOLUME}.tar.gz" -C /source . 2>/dev/null; then
 

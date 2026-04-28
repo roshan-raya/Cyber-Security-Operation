@@ -22,6 +22,15 @@ else
   exit 1
 fi
 
+# Cross-platform path handling: Docker Desktop on Windows (Git Bash / MSYS) needs
+# Windows-style paths (C:/Users/...) for bind mounts. Linux and macOS use $(pwd) directly.
+if [ -n "${MSYSTEM:-}" ]; then
+  export MSYS_NO_PATHCONV=1
+  PWD_NATIVE="$(pwd -W)"
+else
+  PWD_NATIVE="$(pwd)"
+fi
+
 # ── Argument check ────────────────────────────────────────────────────────
 if [ -z "${BACKUP_DIR}" ]; then
   echo "Usage: $0 <backup_dir>"
@@ -106,7 +115,7 @@ print(vols[0].get('sha256', '') if vols else '')
   # Restore via disposable alpine container
   if docker run --rm \
     -v "${VOLUME}:/dest" \
-    -v "$(pwd)/${BACKUP_DIR}:/source:ro" \
+    -v "${PWD_NATIVE}/${BACKUP_DIR}:/source:ro" \
     alpine:3.19 \
     sh -c "cd /dest && tar xzf /source/${VOLUME}.tar.gz" 2>/dev/null; then
     echo "OK"
