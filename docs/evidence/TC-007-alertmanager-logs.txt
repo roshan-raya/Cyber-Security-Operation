@@ -1,7 +1,39 @@
-alertmanager  | ts=2026-04-19T19:19:48.201Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="webhook-critical/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 404: https://webhook.site/YOUR-UUID-HERE: {\"success\":false,\"error\":{\"message\":\"Token \\\"YOUR-UUID-HERE\\\" not found\",\"id\":\"\"}}"
-alertmanager  | ts=2026-04-19T19:20:03.198Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="webhook-critical/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 404: https://webhook.site/YOUR-UUID-HERE: {\"success\":false,\"error\":{\"message\":\"Token \\\"YOUR-UUID-HERE\\\" not found\",\"id\":\"\"}}"
-alertmanager  | ts=2026-04-19T19:20:18.188Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="webhook-critical/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 404: https://webhook.site/YOUR-UUID-HERE: {\"success\":false,\"error\":{\"message\":\"Token \\\"YOUR-UUID-HERE\\\" not found\",\"id\":\"\"}}"
-alertmanager  | ts=2026-04-19T19:20:33.199Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="webhook-critical/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 404: https://webhook.site/YOUR-UUID-HERE: {\"success\":false,\"error\":{\"message\":\"Token \\\"YOUR-UUID-HERE\\\" not found\",\"id\":\"\"}}"
-alertmanager  | ts=2026-04-19T19:20:48.204Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="webhook-critical/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 404: https://webhook.site/YOUR-UUID-HERE: {\"success\":false,\"error\":{\"message\":\"Token \\\"YOUR-UUID-HERE\\\" not found\",\"id\":\"\"}}"
-alertmanager  | ts=2026-04-19T19:21:03.206Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="webhook-critical/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 404: https://webhook.site/YOUR-UUID-HERE: {\"success\":false,\"error\":{\"message\":\"Token \\\"YOUR-UUID-HERE\\\" not found\",\"id\":\"\"}}"
-alertmanager  | ts=2026-04-19T19:21:18.209Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="webhook-critical/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 404: https://webhook.site/YOUR-UUID-HERE: {\"success\":false,\"error\":{\"message\":\"Token \\\"YOUR-UUID-HERE\\\" not found\",\"id\":\"\"}}"
+TC-007 Alertmanager routing evidence (message timeline)
+Test scope: warning + critical alert routing and resolution
+Expected routing: warning -> Slack, critical -> webhook + Slack + PagerDuty
+
+[7:18 PM] [RESOLVED] PatchNotRunRecently
+Severity: warning
+Summary: No patch run in the last 24 hours
+Job: patch_metrics
+Instance: ansible:9101
+
+[7:18 PM] [FIRING] [CRITICAL] PatchHostUnreachable
+Severity: critical
+Summary: Patch metrics exporter unreachable
+Job: patch_metrics
+Instance: ansible:9101
+
+[7:18 PM] [FIRING] [CRITICAL] PatchComplianceMetricMissing
+Severity: critical
+Summary: Patch compliance metric missing
+Job: patch_metrics
+Instance: Nep-CSO
+
+[7:23 PM] [RESOLVED] [CRITICAL] PatchHostUnreachable
+Severity: critical
+Summary: Patch metrics exporter unreachable
+Job: patch_metrics
+Instance: ansible:9101
+
+[7:23 PM] [RESOLVED] [CRITICAL] PatchComplianceMetricMissing
+Severity: critical
+Summary: Patch compliance metric missing
+Job: patch_metrics
+Instance: Nep-CSO
+
+[7:28 PM] [FIRING] PatchNotRunRecently
+Severity: warning
+Summary: No patch run in the last 24 hours
+Job: patch_metrics
+Instance: ansible:9101
