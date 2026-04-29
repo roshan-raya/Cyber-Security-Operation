@@ -50,3 +50,26 @@ These dashboards allow quick identification of failures and system performance i
   - alertmanager = UP
 
 This confirms that the monitoring pipeline is working correctly and displaying real-time data.
+
+## Project Integration
+
+My work connects directly with other team members:
+
+- Roshan (Ansible): Generates patch results
+- Shistu (Prometheus): Collects metrics
+- Anjali (Grafana): Visualises data through dashboards
+- Himanshu (Testing): Validates system through testing
+
+This ensures the system is not only automated but also monitored and validated.
+
+## Importance of My Role
+
+Without monitoring, patching cannot be verified.
+
+My dashboards provide:
+- Visibility of system health
+- Detection of failures
+- Evidence of patch success
+- Support for decision-making
+
+This makes the system reliable and secure.
