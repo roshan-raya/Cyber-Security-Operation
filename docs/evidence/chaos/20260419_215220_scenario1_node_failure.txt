@@ -183,3 +183,50 @@ skipping: [patch-target-5]
 TASK [patch : Validate system health (uptime >= 0)] ****************************
 ok: [patch-target-4] => {
     "changed": false,
+"msg": "All assertions passed"
+}
+
+TASK [patch : Check if reboot required] ****************************************
+ok: [patch-target-1]
+
+TASK [patch : Re-gather facts after reboot] ************************************
+skipping: [patch-target-5]
+
+TASK [patch : Reboot if required] **********************************************
+skipping: [patch-target-1]
+
+TASK [patch : Validate system health (uptime >= 0)] ****************************
+ok: [patch-target-5] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-1]
+
+TASK [patch : Wait for connection after reboot] ********************************
+skipping: [patch-target-1]
+
+TASK [patch : Check if reboot required] ****************************************
+ok: [patch-target-2]
+
+TASK [patch : Re-gather facts after reboot] ************************************
+skipping: [patch-target-1]
+
+TASK [patch : Reboot if required] **********************************************
+skipping: [patch-target-2]
+
+TASK [patch : Validate system health (uptime >= 0)] ****************************
+ok: [patch-target-1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-2]
+
+TASK [patch : Wait for connection after reboot] ********************************
+skipping: [patch-target-2]
+
+TASK [patch : Re-gather facts after reboot] ************************************
+skipping: [patch-target-2]
