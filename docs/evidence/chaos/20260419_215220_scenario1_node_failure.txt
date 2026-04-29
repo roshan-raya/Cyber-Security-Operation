@@ -89,3 +89,50 @@ ok: [patch-target-2] => {
     "msg": "patch-target-2: SSH OK, uptime OK, ssh service active"
 }
 ok: [patch-target-5] => {
+    "msg": "patch-target-5: SSH OK, uptime OK, ssh service active"
+}
+ok: [patch-target-4] => {
+    "msg": "patch-target-4: SSH OK, uptime OK, ssh service active"
+}
+
+TASK [patch : Capture pre-patch package snapshot for rollback] *****************
+ok: [patch-target-5]
+ok: [patch-target-2]
+ok: [patch-target-1]
+ok: [patch-target-4]
+
+TASK [patch : Store rollback package list from pre-patch snapshot] *************
+ok: [patch-target-1]
+ok: [patch-target-2]
+ok: [patch-target-5]
+ok: [patch-target-4]
+
+TASK [patch : Gather facts] ****************************************************
+ok: [patch-target-2]
+ok: [patch-target-1]
+ok: [patch-target-4]
+ok: [patch-target-5]
+
+TASK [patch : Update apt cache] ************************************************
+ok: [patch-target-5]
+ok: [patch-target-4]
+
+TASK [patch : FAILURE SIMULATION (optional) - force this host to fail] *********
+skipping: [patch-target-4]
+skipping: [patch-target-5]
+
+TASK [patch : Update apt cache] ************************************************
+ok: [patch-target-1]
+ok: [patch-target-2]
+
+TASK [patch : FAILURE SIMULATION (optional) - force this host to fail] *********
+skipping: [patch-target-1]
+skipping: [patch-target-2]
+
+TASK [patch : Upgrade packages (security and safe updates)] ********************
+ok: [patch-target-4]
+
+TASK [patch : Set patch changed flag] ******************************************
+ok: [patch-target-4]
+
+TASK [patch : Upgrade packages (security and safe updates)] ********************
