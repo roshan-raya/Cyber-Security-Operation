@@ -136,3 +136,50 @@ TASK [patch : Set patch changed flag] ******************************************
 ok: [patch-target-4]
 
 TASK [patch : Upgrade packages (security and safe updates)] ********************
+ok: [patch-target-5]
+
+TASK [patch : Set patch changed flag] ******************************************
+ok: [patch-target-5]
+
+TASK [patch : Upgrade packages (security and safe updates)] ********************
+ok: [patch-target-1]
+
+TASK [patch : Set patch changed flag] ******************************************
+ok: [patch-target-1]
+
+TASK [patch : Upgrade packages (security and safe updates)] ********************
+ok: [patch-target-2]
+
+TASK [patch : Set patch changed flag] ******************************************
+ok: [patch-target-2]
+
+TASK [patch : Check if reboot required] ****************************************
+ok: [patch-target-4]
+
+TASK [patch : Reboot if required] **********************************************
+skipping: [patch-target-4]
+
+TASK [patch : Check if reboot required] ****************************************
+ok: [patch-target-5]
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-4]
+
+TASK [patch : Reboot if required] **********************************************
+skipping: [patch-target-5]
+
+TASK [patch : Wait for connection after reboot] ********************************
+skipping: [patch-target-4]
+
+TASK [patch : Set patch rebooted flag] *****************************************
+ok: [patch-target-5]
+
+TASK [patch : Re-gather facts after reboot] ************************************
+skipping: [patch-target-4]
+
+TASK [patch : Wait for connection after reboot] ********************************
+skipping: [patch-target-5]
+
+TASK [patch : Validate system health (uptime >= 0)] ****************************
+ok: [patch-target-4] => {
+    "changed": false,
