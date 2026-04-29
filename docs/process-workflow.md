@@ -1,7 +1,7 @@
 # Process Workflow — Patch Lifecycle
 **Catnip Games International — Patch Management System (as built)**
 
-This document describes how patching is currently run in this repository, both in CI and
+This document describes how patching is actually run in this repository, both in CI and
 for manual operator runs.
 
 ---
@@ -132,8 +132,27 @@ Current committed evidence path: `docs/evidence/chaos/`
 | PatchFailure | patch_host_success == 0 | warning | 1 minute |
 | PatchDurationTooHigh | duration_seconds > 120 | warning | 1 minute |
 | PatchNotRunRecently | no run in 24 hours | warning | 5 minutes |
+| PatchMetricsStale | exporter up but last run timestamp stale | warning | 10 minutes |
 | PatchFailureCritical | patch_host_success == 0 | critical | 2 minutes |
 | PatchHostUnreachable | metrics exporter down | critical | 2 minutes |
 | PatchComplianceLow | compliance_percentage < 80 | warning | 5 minutes |
+| PatchDurationSLAExceeded | duration_seconds > 7200 | critical | 2 minutes |
+| PatchComplianceCritical | compliance_percentage < 80 | critical | 5 minutes |
+| PatchComplianceMetricMissing | compliance metric absent | critical | 2 minutes |
 | CriticalCVEsRemaining | patch_scan_critical_cves > 0 | critical | 5 minutes |
 | HighCVEsAboveThreshold | patch_scan_high_cves > 5 | warning | 5 minutes |
+
+## 6) Alert routing currently used
+
+Alertmanager routing in this implementation:
+- warning -> Slack channel (`slack-warning`)
+- critical -> webhook + Slack + PagerDuty (`webhook-critical`, `slack-critical`, `pagerduty-critical`)
+- fallback -> console receiver
+
+This routing was tested by triggering both warning and critical alerts and checking
+delivery in Prometheus/Alertmanager and the downstream receivers.
+
+Practical test notes from my implementation:
+- Warning test: `PatchNotRunRecently` reached Slack.
+- Critical test: stopping `ansible` triggered `PatchHostUnreachable` and `PatchComplianceMetricMissing`.
+- Critical delivery was confirmed across webhook, Slack, and PagerDuty.

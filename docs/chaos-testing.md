@@ -1,7 +1,7 @@
 # Chaos Testing — Patch Management Platform
 **Catnip Games International**
 
-Chaos testing validates that the system recovers correctly from real-world failures
+Chaos testing validates that this system recovers correctly from real-world failures
 that could occur during a production patch window.
 
 ## Why chaos testing matters
@@ -45,7 +45,7 @@ inside the ansible container (the image has no `pkill`; it uses a short Python
 **Expected behaviour:**
 - Prometheus detects the patch_metrics target as DOWN within 15 seconds
 - PatchHostUnreachable alert fires (critical severity)
-- Alert routes to webhook-critical receiver
+- Alert routes to critical receivers (webhook + Slack + PagerDuty)
 - After exporter restarts, metrics resume and alert resolves
 
 **Recovery command:**
@@ -80,7 +80,8 @@ make patch ENV=hosts LIMIT=patch-target-1
 ## Running chaos tests
 
 ```bash
-# Optional: enable webhook notifications (Slack-compatible payload)
+# Optional: set a webhook URL only if you want script-level summary posts
+# (Alertmanager notification routing is configured separately in alertmanager.yml)
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 # All scenarios
