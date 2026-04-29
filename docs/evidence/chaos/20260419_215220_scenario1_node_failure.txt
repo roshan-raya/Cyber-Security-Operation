@@ -277,3 +277,85 @@ TASK [security_scan : Parse CVE counts from scan results] **********************
 skipping: [patch-target-1]
 skipping: [patch-target-2]
 skipping: [patch-target-4]
+skipping: [patch-target-5]
+
+TASK [security_scan : Set scan defaults if scan was skipped or failed] *********
+ok: [patch-target-1]
+ok: [patch-target-2]
+ok: [patch-target-4]
+ok: [patch-target-5]
+
+TASK [security_scan : Log scan summary] ****************************************
+ok: [patch-target-1] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-1. Critical CVEs: 0. High CVEs: 0.\n"
+}
+ok: [patch-target-2] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-2. Critical CVEs: 0. High CVEs: 0.\n"
+}
+ok: [patch-target-4] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-4. Critical CVEs: 0. High CVEs: 0.\n"
+}
+ok: [patch-target-5] => {
+    "msg": "Security scan skipped (Trivy not available) on patch-target-5. Critical CVEs: 0. High CVEs: 0.\n"
+}
+
+TASK [security_scan : Fail if critical CVEs found and scan_fail_on_critical is true] ***
+skipping: [patch-target-1]
+skipping: [patch-target-2]
+skipping: [patch-target-4]
+skipping: [patch-target-5]
+
+PLAY [Generate patch reports] **************************************************
+
+TASK [reporting : Gather facts (for timestamp/duration)] ***********************
+ok: [localhost]
+
+TASK [reporting : Ensure reports directory exists] *****************************
+ok: [localhost]
+
+TASK [reporting : Get patch start epoch for reporting (from first host in inventory)] ***
+ok: [localhost]
+
+TASK [reporting : Build report list per host] **********************************
+ok: [localhost] => (item=patch-target-1)
+ok: [localhost] => (item=patch-target-2)
+ok: [localhost] => (item=patch-target-3)
+ok: [localhost] => (item=patch-target-4)
+ok: [localhost] => (item=patch-target-5)
+
+TASK [reporting : Set patch compliance percentage] *****************************
+ok: [localhost]
+
+TASK [reporting : Write patch report JSON (timestamped)] ***********************
+changed: [localhost]
+
+TASK [reporting : Write patch_report_latest.json] ******************************
+changed: [localhost]
+
+TASK [reporting : Generate SHA256 signature for patch report] ******************
+ok: [localhost]
+
+TASK [reporting : Write report signature file] *********************************
+changed: [localhost]
+
+TASK [reporting : Write audit trail entry] *************************************
+changed: [localhost]
+
+TASK [reporting : Write patch_report_latest.csv] *******************************
+changed: [localhost]
+
+TASK [reporting : Generate Prometheus patch metrics file] **********************
+changed: [localhost]
+
+TASK [reporting : Structured summary] ******************************************
+ok: [localhost] => {
+    "msg": "Patch run complete. Report: /ansible/reports/patch_report_latest.json (env=unspecified, group=all)"
+}
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=13   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+patch-target-1             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+patch-target-2             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+patch-target-3             : ok=0    changed=0    unreachable=1    failed=0    skipped=0    rescued=0    ignored=0   
+patch-target-4             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+patch-target-5             : ok=25   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
