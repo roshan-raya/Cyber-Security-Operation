@@ -1,1 +1,44 @@
-senario
+PLAY [Patch all hosts] *********************************************************
+[WARNING]: Using run_once with the free strategy is not currently supported.
+This task will still be executed for every host in the inventory list.
+
+TASK [Gathering Facts] *********************************************************
+fatal: [patch-target-3]: UNREACHABLE! => {"changed": false, "msg": "Failed to connect to the host via ssh: ssh: Could not resolve hostname patch-target-3: Name or service not known", "unreachable": true}
+ok: [patch-target-2]
+
+TASK [common : Record start time] **********************************************
+ok: [patch-target-2]
+
+TASK [common : Set patch failed flag (default)] ********************************
+ok: [patch-target-2]
+
+TASK [Gathering Facts] *********************************************************
+ok: [patch-target-4]
+
+TASK [common : Record start time] **********************************************
+ok: [patch-target-4]
+
+TASK [Gathering Facts] *********************************************************
+ok: [patch-target-1]
+ok: [patch-target-5]
+
+TASK [common : Set patch failed flag (default)] ********************************
+ok: [patch-target-4]
+
+TASK [common : Record start time] **********************************************
+ok: [patch-target-1]
+ok: [patch-target-5]
+
+TASK [common : Set patch failed flag (default)] ********************************
+ok: [patch-target-1]
+ok: [patch-target-5]
+
+TASK [health_check : Gather facts] *********************************************
+ok: [patch-target-2]
+ok: [patch-target-4]
+ok: [patch-target-1]
+ok: [patch-target-5]
+
+TASK [health_check : Ping (connection check)] **********************************
+ok: [patch-target-2]
+ok: [patch-target-4]
