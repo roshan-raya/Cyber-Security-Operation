@@ -164,5 +164,47 @@ Proven Target:
 •	2-hour patch window achieved
  
 E. Report Verification
+Implemented automated validation of generated reports to ensure evidence files were complete and accurate.
+Script:
+scripts/verify-report.sh
+Checks Included:
+•	Report exists
+•	Required fields present
+•	Compliance values valid
+•	Output readable for auditors/demo
+ 
+F. Metrics Exporting
+Created a Python exporter for logs and metrics so Prometheus could scrape operational data.
+File:
+scripts/log_metrics_exporter.py
+Result:
+Enabled dashboards, alerts, and real-time visibility.
+ 
+5. Documentation Produced
+Test Cases
+docs/test-cases.md
+Contains:
+•	Test objectives
+•	Steps to execute
+•	Expected results
+•	Actual outcomes
+•	Pass/fail status
+Chaos Testing Guide
+docs/chaos-testing.md
+Contains:
+•	Failure scenarios
+•	Recovery steps
+•	Validation checks
+•	Lessons learned
+ 
+6. Demo Achievements
+During the live demonstration, My testing components successfully proved:
+•	Chaos tests executed live
+•	Recovery completed successfully
+•	Benchmark targets met
+•	95% compliance achieved
+•	2-hour maintenance window proven
+•	Evidence logs generated for review
+ 
 
 
