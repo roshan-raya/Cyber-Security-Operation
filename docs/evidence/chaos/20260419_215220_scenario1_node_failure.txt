@@ -42,3 +42,50 @@ ok: [patch-target-5]
 TASK [health_check : Ping (connection check)] **********************************
 ok: [patch-target-2]
 ok: [patch-target-4]
+ok: [patch-target-1]
+ok: [patch-target-5]
+
+TASK [health_check : Check system uptime] **************************************
+ok: [patch-target-2]
+ok: [patch-target-5]
+ok: [patch-target-1]
+ok: [patch-target-4]
+
+TASK [health_check : Display uptime] *******************************************
+ok: [patch-target-1] => {
+    "uptime_out.stdout": " 20:52:35 up  2:29,  0 users,  load average: 2.39, 1.31, 1.22"
+}
+ok: [patch-target-2] => {
+    "uptime_out.stdout": " 20:52:35 up  2:29,  0 users,  load average: 2.39, 1.31, 1.22"
+}
+ok: [patch-target-5] => {
+    "uptime_out.stdout": " 20:52:35 up  2:29,  0 users,  load average: 2.39, 1.31, 1.22"
+}
+ok: [patch-target-4] => {
+    "uptime_out.stdout": " 20:52:35 up  2:29,  0 users,  load average: 2.39, 1.31, 1.22"
+}
+
+TASK [health_check : Ensure SSH service is active (try ssh)] *******************
+ok: [patch-target-2]
+ok: [patch-target-1]
+ok: [patch-target-5]
+ok: [patch-target-4]
+
+TASK [health_check : Ensure SSH service is active (try sshd)] ******************
+skipping: [patch-target-1]
+skipping: [patch-target-2]
+skipping: [patch-target-5]
+
+TASK [health_check : Health check summary] *************************************
+ok: [patch-target-1] => {
+    "msg": "patch-target-1: SSH OK, uptime OK, ssh service active"
+}
+
+TASK [health_check : Ensure SSH service is active (try sshd)] ******************
+skipping: [patch-target-4]
+
+TASK [health_check : Health check summary] *************************************
+ok: [patch-target-2] => {
+    "msg": "patch-target-2: SSH OK, uptime OK, ssh service active"
+}
+ok: [patch-target-5] => {
