@@ -230,3 +230,50 @@ skipping: [patch-target-2]
 
 TASK [patch : Re-gather facts after reboot] ************************************
 skipping: [patch-target-2]
+
+TASK [patch : Validate system health (uptime >= 0)] ****************************
+ok: [patch-target-2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [security_scan : Ensure scan output directory exists] *********************
+ok: [patch-target-4]
+ok: [patch-target-5]
+ok: [patch-target-1]
+ok: [patch-target-2]
+
+TASK [security_scan : Check if Trivy is already installed] *********************
+ok: [patch-target-4]
+ok: [patch-target-5]
+ok: [patch-target-1]
+ok: [patch-target-2]
+
+TASK [security_scan : Download Trivy binary] ***********************************
+ok: [patch-target-4]
+ok: [patch-target-1]
+ok: [patch-target-2]
+ok: [patch-target-5]
+
+TASK [security_scan : Extract Trivy binary] ************************************
+skipping: [patch-target-1]
+skipping: [patch-target-4]
+skipping: [patch-target-2]
+skipping: [patch-target-5]
+
+TASK [security_scan : Run Trivy OS package scan] *******************************
+ok: [patch-target-4]
+ok: [patch-target-1]
+ok: [patch-target-2]
+ok: [patch-target-5]
+
+TASK [security_scan : Read scan results] ***************************************
+ok: [patch-target-2]
+ok: [patch-target-4]
+ok: [patch-target-1]
+ok: [patch-target-5]
+
+TASK [security_scan : Parse CVE counts from scan results] **********************
+skipping: [patch-target-1]
+skipping: [patch-target-2]
+skipping: [patch-target-4]
